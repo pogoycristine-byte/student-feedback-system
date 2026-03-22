@@ -1,0 +1,947 @@
+/* ===================================
+   GLOBAL THEME VARIABLES & STYLES
+   =================================== */
+
+:root {
+  --bg-gradient-start: #111827;
+  --bg-gradient-mid: #581c87;
+  --bg-gradient-end: #831843;
+
+  --sidebar-bg: rgba(255, 255, 255, 0.05);
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+
+  --card-bg: rgba(255, 255, 255, 0.1);
+  --card-border: rgba(255, 255, 255, 0.2);
+  --card-hover: rgba(255, 255, 255, 0.15);
+
+  --text-primary: #ffffff;
+  --text-secondary: #d1d5db;
+  --text-tertiary: #9ca3af;
+
+  --input-bg: rgba(255, 255, 255, 0.1);
+  --input-border: rgba(255, 255, 255, 0.2);
+  --input-text: #ffffff;
+  --input-placeholder: #9ca3af;
+
+  --modal-bg: #1f2937;
+  --modal-overlay: rgba(0, 0, 0, 0.5);
+
+  --table-header-bg: rgba(255, 255, 255, 0.05);
+  --table-row-hover: rgba(255, 255, 255, 0.05);
+  --table-border: rgba(255, 255, 255, 0.1);
+
+  --shadow-color: rgba(0, 0, 0, 0.3);
+}
+
+/* ===================================
+   LIGHT MODE — GLASSMORPHISM THEME
+   =================================== */
+
+.light-mode {
+  --bg-gradient-start: #ffffff;
+  --bg-gradient-mid:   #ffffff;
+  --bg-gradient-end:   #ffffff;
+
+  --sidebar-bg: linear-gradient(180deg, #7c3aed 0%, #9333ea 50%, #db2777 100%);
+  --sidebar-border: rgba(219, 39, 119, 0.3);
+
+  --card-bg: rgba(255, 255, 255, 0.55);
+  --card-border: rgba(255, 255, 255, 0.75);
+  --card-hover: rgba(255, 255, 255, 0.7);
+
+  --text-primary: #1e1b4b;
+  --text-secondary: #4c1d95;
+  --text-tertiary: #6b7280;
+
+  --input-bg: rgba(255, 255, 255, 0.6);
+  --input-border: rgba(139, 92, 246, 0.25);
+  --input-text: #1e1b4b;
+  --input-placeholder: #9ca3af;
+
+  --modal-bg: rgba(255, 255, 255, 0.85);
+  --modal-overlay: rgba(109, 40, 217, 0.15);
+
+  --table-header-bg: rgba(237, 233, 254, 0.6);
+  --table-row-hover: rgba(237, 233, 254, 0.4);
+  --table-border: rgba(196, 181, 253, 0.3);
+
+  --shadow-color: rgba(109, 40, 217, 0.12);
+}
+
+/* ===================================
+   GLOBAL STYLES
+   =================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===================================
+   UTILITY CLASSES
+   =================================== */
+
+.bg-app-gradient {
+  background: linear-gradient(135deg,
+    var(--bg-gradient-start),
+    var(--bg-gradient-mid),
+    var(--bg-gradient-end)
+  );
+}
+
+.bg-sidebar    { background: var(--sidebar-bg); border-color: var(--sidebar-border); }
+.bg-card       { background-color: var(--card-bg); border-color: var(--card-border); }
+.bg-card:hover { background-color: var(--card-hover); }
+
+.text-app-primary   { color: var(--text-primary)   !important; }
+.text-app-secondary { color: var(--text-secondary)  !important; }
+.text-app-tertiary  { color: var(--text-tertiary)   !important; }
+
+.bg-input         { background-color: var(--input-bg); border-color: var(--input-border); color: var(--input-text); }
+.bg-modal         { background-color: var(--modal-bg); }
+.bg-modal-overlay { background-color: var(--modal-overlay); }
+
+/* ===================================
+   LIGHT MODE — BACKGROUND + ORBS
+   =================================== */
+
+.light-mode .bg-app-gradient {
+  background: linear-gradient(135deg, #ede9fe 0%, #fce7f3 50%, #ddd6fe 100%);
+  min-height: 100vh;
+  position: relative;
+}
+
+.light-mode .bg-app-gradient::before {
+  content: '';
+  position: fixed;
+  top: -20%; right: -10%;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(167,139,250,0.22) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.light-mode .bg-app-gradient::after {
+  content: '';
+  position: fixed;
+  bottom: -10%; left: 10%;
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(236,72,153,0.14) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ===================================
+   LIGHT MODE — SIDEBAR
+   =================================== */
+
+.light-mode .w-64.bg-white\/5 {
+  background: linear-gradient(180deg, #5b21b6 0%, #7c3aed 45%, #be185d 100%) !important;
+  border-right: 1px solid rgba(255,255,255,0.2);
+  box-shadow: 4px 0 24px rgba(109,40,217,0.35);
+  backdrop-filter: blur(20px);
+}
+
+.light-mode .w-64.bg-white\/5 *              { color: #ffffff !important; }
+.light-mode .w-64.bg-white\/5 h1             { color: #ffffff !important; text-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+.light-mode .w-64.bg-white\/5 p              { color: #ffffff !important; }
+.light-mode .w-64.bg-white\/5 p.text-gray-400  { color: #ffffff !important; }
+.light-mode .w-64.bg-white\/5 span.text-violet-300 { color: #ffffff !important; }
+.light-mode .w-64.bg-white\/5 span.bg-violet-500\/30 {
+  background: rgba(255,255,255,0.25) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,0.4) !important;
+}
+.light-mode .w-64.bg-white\/5 nav a          { color: #ffffff !important; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
+.light-mode .w-64.bg-white\/5 nav a:hover {
+  background-color: rgba(255,255,255,0.18) !important;
+  color: #ffffff !important;
+}
+
+.light-mode .w-64.bg-white\/5 nav a.bg-gradient-to-r {
+  background: rgba(255,255,255,0.28) !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  border: 1px solid rgba(255,255,255,0.35);
+}
+
+.light-mode .w-64.bg-white\/5 button        { color: rgba(255,255,255,0.85) !important; }
+.light-mode .w-64.bg-white\/5 button:hover  { background-color: rgba(239,68,68,0.25) !important; color: #ffffff !important; }
+
+/* ===================================
+   LIGHT MODE — MAIN TEXT
+   =================================== */
+
+.light-mode .text-white    { color: #1e1b4b !important; }
+.light-mode .text-gray-300 { color: #4c1d95 !important; }
+.light-mode .text-gray-400 { color: #6b7280 !important; }
+.light-mode .text-gray-500 { color: #6b7280 !important; }
+
+/* ===================================
+   LIGHT MODE — GLASS CARD BASE
+   =================================== */
+
+.light-mode .bg-white\/10 {
+  background: rgba(255, 255, 255, 0.55) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.75) !important;
+  box-shadow:
+    0 8px 32px rgba(109,40,217,0.08),
+    0 2px 8px rgba(0,0,0,0.04),
+    inset 0 1px 0 rgba(255,255,255,0.9) !important;
+}
+
+.light-mode .bg-white\/10:hover {
+  background: rgba(255,255,255,0.68) !important;
+  box-shadow:
+    0 12px 40px rgba(109,40,217,0.12),
+    0 4px 12px rgba(0,0,0,0.06),
+    inset 0 1px 0 rgba(255,255,255,0.95) !important;
+  transform: translateY(-1px);
+}
+
+/* ===================================
+   LIGHT MODE — TOP CATEGORIES & NEEDS ATTENTION
+   (2-col grid — keep white glass, dark text)
+   =================================== */
+
+.light-mode .grid.grid-cols-1.md\:grid-cols-2 > .bg-white\/10 {
+  background: rgba(255,255,255,0.62) !important;
+  backdrop-filter: blur(24px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+  border: 1px solid rgba(255,255,255,0.82) !important;
+  box-shadow:
+    0 8px 32px rgba(109,40,217,0.08),
+    0 2px 8px rgba(0,0,0,0.04),
+    inset 0 1px 0 rgba(255,255,255,0.95) !important;
+}
+
+.light-mode .grid.grid-cols-1.md\:grid-cols-2 > .bg-white\/10 h3         { color: #1e1b4b !important; font-weight: 700; }
+.light-mode .grid.grid-cols-1.md\:grid-cols-2 > .bg-white\/10 .text-white { color: #1e1b4b !important; }
+.light-mode .grid.grid-cols-1.md\:grid-cols-2 > .bg-white\/10 .text-gray-200 { color: #111827 !important; }
+.light-mode .grid.grid-cols-1.md\:grid-cols-2 > .bg-white\/10 .text-gray-400 { color: #4b5563 !important; }
+.light-mode .grid.grid-cols-1.md\:grid-cols-2 > .bg-white\/10 .text-gray-500 { color: #6b7280 !important; }
+.light-mode .grid.grid-cols-1.md\:grid-cols-2 > .bg-white\/10 p.text-sm  { color: #6b7280 !important; }
+
+/* Keep progress bar gradient */
+.light-mode .grid.grid-cols-1.md\:grid-cols-2 > .bg-white\/10 .bg-gradient-to-r.from-violet-500 {
+  background: linear-gradient(to right, #8b5cf6, #ec4899) !important;
+}
+
+/* Inner mini-cards (Needs Attention items) */
+.light-mode .grid.grid-cols-1.md\:grid-cols-2 > .bg-white\/10 .bg-white\/5 {
+  background: rgba(237,233,254,0.35) !important;
+  border-color: rgba(196,181,253,0.3) !important;
+}
+
+/* ===================================
+   LIGHT MODE — BREAKDOWN BAR CARD (px-5)
+   =================================== */
+
+.light-mode .bg-white\/10.backdrop-blur-lg.rounded-xl.px-5 {
+  background: rgba(255,255,255,0.62) !important;
+  border: 1px solid rgba(255,255,255,0.82) !important;
+  box-shadow: 0 8px 32px rgba(109,40,217,0.08), inset 0 1px 0 rgba(255,255,255,0.9) !important;
+}
+
+.light-mode .bg-white\/10.backdrop-blur-lg.rounded-xl.px-5 .text-white    { color: #1e1b4b !important; }
+.light-mode .bg-white\/10.backdrop-blur-lg.rounded-xl.px-5 .text-gray-400 { color: #6b7280 !important; }
+
+.light-mode .bg-white\/10.backdrop-blur-lg.rounded-xl.px-5 .bg-white\/5 {
+  background: rgba(237,233,254,0.45) !important;
+  border: 1px solid rgba(196,181,253,0.25) !important;
+}
+
+/* ===================================
+   LIGHT MODE — HEADER PILLS (px-4)
+   =================================== */
+
+.light-mode .bg-white\/10.backdrop-blur-lg.rounded-xl.px-4 {
+  background: rgba(255,255,255,0.68) !important;
+  border: 1px solid rgba(255,255,255,0.88) !important;
+  box-shadow: 0 4px 16px rgba(109,40,217,0.1), inset 0 1px 0 rgba(255,255,255,0.9) !important;
+}
+
+.light-mode .bg-white\/10.backdrop-blur-lg.rounded-xl.px-4 .text-white    { color: #1e1b4b !important; }
+.light-mode .bg-white\/10.backdrop-blur-lg.rounded-xl.px-4 .text-gray-400 { color: #6b7280 !important; }
+
+/* ===================================
+   LIGHT MODE — p-6 CARDS
+   =================================== */
+
+.light-mode .bg-white\/10.backdrop-blur-lg.rounded-xl.p-6 {
+  background: rgba(255,255,255,0.62) !important;
+  border: 1px solid rgba(255,255,255,0.82) !important;
+  box-shadow: 0 8px 32px rgba(109,40,217,0.08), inset 0 1px 0 rgba(255,255,255,0.9) !important;
+}
+
+.light-mode .bg-white\/10.backdrop-blur-lg.rounded-xl.p-6 .text-white     { color: #1e1b4b !important; }
+.light-mode .bg-white\/10.backdrop-blur-lg.rounded-xl.p-6 .text-gray-200  { color: #374151 !important; }
+.light-mode .bg-white\/10.backdrop-blur-lg.rounded-xl.p-6 .text-gray-400  { color: #6b7280 !important; }
+.light-mode .bg-white\/10.backdrop-blur-lg.rounded-xl.p-6 .text-gray-500  { color: #6b7280 !important; }
+
+/* ===================================
+   LIGHT MODE — FEEDBACK TABLE
+   =================================== */
+
+.light-mode table {
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.75);
+}
+
+.light-mode table thead {
+  background: rgba(237,233,254,0.65);
+  border-bottom: 1px solid rgba(196,181,253,0.4);
+}
+
+.light-mode table thead th              { color: #4c1d95 !important; letter-spacing: 0.05em; }
+.light-mode table tbody tr              { border-bottom: 1px solid rgba(196,181,253,0.2); }
+.light-mode table tbody tr:hover        { background: rgba(237,233,254,0.35); }
+.light-mode table tbody td              { color: #1e1b4b !important; }
+.light-mode table tbody .text-white     { color: #1e1b4b !important; }
+.light-mode table tbody .text-gray-400  { color: #6b7280 !important; }
+
+/* ===================================
+   LIGHT MODE — INPUTS
+   =================================== */
+
+.light-mode input::placeholder,
+.light-mode textarea::placeholder { color: #9ca3af; }
+
+.light-mode select        { color: #1e1b4b; }
+.light-mode select option { background-color: #ffffff; color: #1e1b4b; }
+
+.light-mode input[type="text"],
+.light-mode input[type="email"],
+.light-mode input[type="password"],
+.light-mode input[type="date"],
+.light-mode input[type="datetime-local"],
+.light-mode textarea,
+.light-mode select {
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(12px);
+  color: #1e1b4b;
+  border: 1px solid rgba(196,181,253,0.45);
+  box-shadow: inset 0 1px 3px rgba(109,40,217,0.06);
+}
+
+.light-mode input:focus,
+.light-mode textarea:focus,
+.light-mode select:focus {
+  border-color: #8b5cf6;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(139,92,246,0.15), inset 0 1px 3px rgba(109,40,217,0.06);
+  background: rgba(255,255,255,0.82);
+}
+
+/* ===================================
+   LIGHT MODE — MODALS
+   =================================== */
+
+.light-mode .fixed.inset-0 {
+  background: rgba(109,40,217,0.12);
+  backdrop-filter: blur(6px);
+}
+
+.light-mode .bg-gray-800 {
+  background: rgba(255,255,255,0.88) !important;
+  backdrop-filter: blur(32px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(200%) !important;
+  border: 1px solid rgba(255,255,255,0.9) !important;
+  box-shadow: 0 24px 64px rgba(109,40,217,0.15), inset 0 1px 0 rgba(255,255,255,0.95) !important;
+  color: #1e1b4b !important;
+}
+
+.light-mode .bg-gray-800 .bg-white\/5   { background: rgba(237,233,254,0.4) !important; border: 1px solid rgba(196,181,253,0.3) !important; }
+.light-mode .bg-gray-800 .text-white    { color: #1e1b4b !important; }
+.light-mode .bg-gray-800 .text-gray-400 { color: #6b7280 !important; }
+.light-mode .bg-gray-800 .text-gray-500 { color: #6b7280 !important; }
+.light-mode .bg-gray-800 .text-gray-300 { color: #4b5563 !important; }
+.light-mode .bg-gray-800 label          { color: #6b7280 !important; }
+
+.light-mode .bg-gray-800 select,
+.light-mode .bg-gray-800 textarea {
+  background: rgba(255,255,255,0.72) !important;
+  border: 1px solid rgba(196,181,253,0.4) !important;
+  color: #1e1b4b !important;
+}
+
+/* ===================================
+   LIGHT MODE — CHARTS (global)
+   =================================== */
+
+.light-mode .recharts-text,
+.light-mode .recharts-label                     { fill: #4b5563 !important; }
+.light-mode .recharts-cartesian-axis-tick-value { fill: #6b7280 !important; }
+
+/* ===================================
+   LIGHT MODE — MISC
+   =================================== */
+
+.light-mode .backdrop-blur-lg {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+.light-mode .border-white\/10,
+.light-mode .border-white\/20     { border-color: rgba(196,181,253,0.35) !important; }
+.light-mode .divide-white\/10 > * { border-color: rgba(196,181,253,0.25) !important; }
+
+/* ===================================
+   BUTTONS — KEEP GRADIENT IN BOTH MODES
+   =================================== */
+
+.bg-gradient-to-r.from-violet-500.to-pink-500 {
+  background: linear-gradient(to right, #8b5cf6, #ec4899) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 15px rgba(139,92,246,0.35);
+}
+
+/* ===================================
+   SMOOTH TRANSITIONS
+   =================================== */
+
+* {
+  transition: background-color 0.3s ease,
+              color 0.3s ease,
+              border-color 0.3s ease,
+              box-shadow 0.3s ease,
+              transform 0.2s ease;
+}
+
+.bg-gradient-to-r,
+.animate-spin,
+.animate-ping,
+button:active,
+input:focus,
+textarea:focus,
+select:focus {
+  transition: none;
+}
+
+/* ===================================
+   LIGHT MODE — REPORTS & ANALYTICS PAGE
+   =================================== */
+
+/* ── Metric cards ── */
+.light-mode .reports-metric-card {
+  background: rgba(255,255,255,0.5) !important;
+  border: 1px solid rgba(255,255,255,0.75) !important;
+  box-shadow: 0 8px 32px rgba(109,40,217,0.1) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+/* Make the color wash MORE opaque in light mode */
+.light-mode .reports-metric-color-wash {
+  opacity: 0.22 !important;
+}
+
+.light-mode .reports-metric-card .text-white  { color: #1e1b4b !important; }
+.light-mode .reports-metric-card .text-gray-500 { color: #6b7280 !important; }
+
+/* ── Chart panel & table wrapper cards ── */
+.light-mode .reports-chart-card {
+  background: rgba(255,255,255,0.62) !important;
+  border: 1px solid rgba(196,181,253,0.5) !important;
+  box-shadow: 0 8px 32px rgba(109,40,217,0.08), inset 0 1px 0 rgba(255,255,255,0.9) !important;
+}
+
+.light-mode .reports-chart-card .text-white   { color: #1e1b4b !important; }
+
+/* ── Timeline status labels & values — force dark in light mode ── */
+.light-mode .reports-page [style*="color: #e2e8f0"] { color: #1e1b4b !important; }
+.light-mode .reports-page [style*="color: white"]   { color: #1e1b4b !important; }
+.light-mode .reports-page [style*="color:white"]    { color: #1e1b4b !important; }
+.light-mode .reports-page [style*="fontSize: 13"]   { color: #1e1b4b !important; }
+.light-mode .reports-page [style*="fontSize: 16"]   { color: #1e1b4b !important; }
+.light-mode .reports-page [style*="fontWeight: 800"] { color: #1e1b4b !important; }
+.light-mode .reports-page [style*="fontWeight: 600"] { color: #374151 !important; }
+.light-mode .reports-chart-card .text-gray-500 { color: #6b7280 !important; }
+
+/* ── "Live data" pill ── */
+.light-mode .reports-page .bg-white\/5 {
+  background: rgba(255,255,255,0.7) !important;
+  border-color: rgba(196,181,253,0.4) !important;
+}
+.light-mode .reports-page .bg-white\/5 .text-gray-400 { color: #6b7280 !important; }
+
+/* ── Override violet-400 header label ── */
+.light-mode .reports-page .text-violet-400 { color: #7c3aed !important; }
+
+/* ── Radar spider grid lines — visible on light bg ── */
+.light-mode .recharts-polar-grid-concentric path,
+.light-mode .recharts-polar-grid-concentric line,
+.light-mode .recharts-polar-grid-angle line {
+  stroke: rgba(109,40,217,0.3) !important;
+}
+
+/* ── Radar area fill ── */
+.light-mode .recharts-radar-polygon {
+  fill: rgba(139,92,246,0.12) !important;
+  stroke: #7c3aed !important;
+  stroke-width: 3px !important;
+}
+
+/* ── Radar axis labels ── */
+.light-mode .recharts-polar-angle-axis-tick text {
+  fill: #4c1d95 !important;
+  font-weight: 600;
+}
+.light-mode .recharts-polar-radius-axis-tick text {
+  fill: #6b7280 !important;
+}
+
+/* ── Radar tooltip ── */
+.light-mode .recharts-tooltip-wrapper > div {
+  background: rgba(255,255,255,0.95) !important;
+  border: 1px solid rgba(139,92,246,0.3) !important;
+  color: #1e1b4b !important;
+}
+.light-mode .recharts-tooltip-wrapper p { color: #1e1b4b !important; }
+
+/* ── Timeline track (progress bar background) ── */
+.light-mode .reports-page .timeline-track {
+  background: rgba(139,92,246,0.12) !important;
+}
+
+/* ── Timeline vertical connector line ── */
+.light-mode .reports-page .timeline-vline {
+  background: rgba(139,92,246,0.2) !important;
+}
+
+/* ── Timeline total pill ── */
+.light-mode .reports-page .timeline-total {
+  background: rgba(237,233,254,0.7) !important;
+  border: 1px solid rgba(196,181,253,0.4) !important;
+}
+.light-mode .reports-page .timeline-total span { color: #1e1b4b !important; }
+
+/* ── Category breakdown table wrapper ── */
+.light-mode .reports-chart-card table {
+  background: transparent !important;
+}
+.light-mode .reports-chart-card thead tr {
+  background: rgba(237,233,254,0.65) !important;
+  border-bottom: 1px solid rgba(196,181,253,0.4) !important;
+}
+.light-mode .reports-chart-card thead th { color: #4c1d95 !important; }
+.light-mode .reports-chart-card tbody tr {
+  border-bottom: 1px solid rgba(196,181,253,0.15) !important;
+}
+.light-mode .reports-chart-card tbody tr:hover {
+  background: rgba(237,233,254,0.35) !important;
+}
+.light-mode .reports-chart-card tbody td       { color: #1e1b4b !important; }
+.light-mode .reports-chart-card tbody .text-white { color: #1e1b4b !important; }
+.light-mode .reports-chart-card tbody .text-gray-400 { color: #6b7280 !important; }
+.light-mode .reports-chart-card tbody .text-gray-500 { color: #6b7280 !important; }
+
+/* ── Progress bar track inside table ── */
+.light-mode .reports-chart-card .share-bar-track {
+  background: rgba(139,92,246,0.12) !important;
+}
+
+/* ── Category dot icon boxes ── */
+.light-mode .reports-chart-card .cat-icon-box {
+  opacity: 0.85;
+}
+
+/* ── Legend dots ── */
+.light-mode .reports-page .legend-dot-label { color: #4c1d95 !important; }
+
+/* ── Timeline row text — status name + count ── */
+.light-mode .reports-page .timeline-status-label { color: #1e1b4b !important; }
+.light-mode .reports-page .timeline-status-value { color: #1e1b4b !important; }
+.light-mode .reports-page .timeline-pct-label    { color: #6b7280 !important; }
+
+/* ===================================
+   LIGHT MODE — FEEDBACK MANAGEMENT,
+   STUDENTS & CATEGORIES PAGES
+   =================================== */
+
+/* ── Shared: page wrapper text ── */
+.light-mode .text-violet-400 { color: #7c3aed !important; }
+.light-mode .text-emerald-300 { color: #059669 !important; }
+.light-mode .text-red-300 { color: #dc2626 !important; }
+.light-mode .text-blue-300 { color: #2563eb !important; }
+.light-mode .text-yellow-300 { color: #d97706 !important; }
+
+/* ── Table wrappers (rounded-2xl with inline dark bg) ── */
+.light-mode [style*="rgba(255,255,255,0.04)"] {
+  background: rgba(255,255,255,0.7) !important;
+  border-color: rgba(196,181,253,0.35) !important;
+}
+
+.light-mode [style*="rgba(255,255,255,0.05)"] {
+  background: rgba(237,233,254,0.55) !important;
+}
+
+/* ── Table header rows ── */
+.light-mode table thead tr[style*="rgba(255,255,255,0.05)"] {
+  background: rgba(237,233,254,0.7) !important;
+  border-bottom-color: rgba(196,181,253,0.4) !important;
+}
+
+.light-mode table thead th.text-gray-400 { color: #4c1d95 !important; }
+
+/* ── Table body rows ── */
+.light-mode table tbody tr[style*="rgba(255,255,255,0.05)"] {
+  border-bottom-color: rgba(196,181,253,0.2) !important;
+}
+.light-mode table tbody tr:hover { background: rgba(237,233,254,0.35) !important; }
+
+/* ── Table cell text ── */
+.light-mode table tbody td .text-white      { color: #1e1b4b !important; }
+.light-mode table tbody td .text-gray-300   { color: #374151 !important; }
+.light-mode table tbody td .text-gray-400   { color: #6b7280 !important; }
+.light-mode table tbody td .text-gray-500   { color: #9ca3af !important; }
+
+/* ── Student name / subject directly in td ── */
+.light-mode table tbody td p.text-white     { color: #1e1b4b !important; }
+.light-mode table tbody td span.text-white  { color: #1e1b4b !important; }
+
+/* ── Category pill in table ── */
+.light-mode table tbody td span[class*="text-gray-300"] {
+  color: #374151 !important;
+  background: rgba(237,233,254,0.5) !important;
+  border-color: rgba(196,181,253,0.4) !important;
+}
+
+/* ── Student ID monospace pill ── */
+.light-mode table tbody td span.font-mono {
+  background: rgba(237,233,254,0.6) !important;
+  border-color: rgba(196,181,253,0.35) !important;
+  color: #4c1d95 !important;
+}
+
+/* ── Status tab pills ── */
+.light-mode button.bg-white\/5.text-gray-400 {
+  background: rgba(255,255,255,0.65) !important;
+  border-color: rgba(196,181,253,0.35) !important;
+  color: #6b7280 !important;
+}
+.light-mode button.bg-white\/5.text-gray-400:hover {
+  background: rgba(237,233,254,0.7) !important;
+  color: #1e1b4b !important;
+}
+
+/* ── Search bar ── */
+.light-mode input.bg-white\/5 {
+  background: rgba(255,255,255,0.75) !important;
+  border-color: rgba(196,181,253,0.4) !important;
+  color: #1e1b4b !important;
+}
+.light-mode input.bg-white\/5::placeholder { color: #9ca3af !important; }
+
+/* ── Date filter panel ── */
+.light-mode .bg-white\/5.border.border-white\/10.rounded-xl {
+  background: rgba(255,255,255,0.65) !important;
+  border-color: rgba(196,181,253,0.35) !important;
+}
+
+/* ── "Showing X of Y" results text ── */
+.light-mode p.text-gray-500.text-xs span.text-white { color: #1e1b4b !important; }
+
+/* ── Header subtitle text ── */
+.light-mode p.text-gray-400.text-sm { color: #6b7280 !important; }
+
+/* ── Active/Inactive count badges in Students header ── */
+.light-mode .bg-emerald-500\/10 {
+  background: rgba(16,185,129,0.12) !important;
+  border-color: rgba(16,185,129,0.3) !important;
+}
+.light-mode .bg-red-500\/10 {
+  background: rgba(239,68,68,0.1) !important;
+  border-color: rgba(239,68,68,0.25) !important;
+}
+.light-mode .text-gray-500 { color: #9ca3af !important; }
+
+/* ── Category list buttons ── */
+.light-mode button[style*="rgba(255,255,255,0.04)"] {
+  background: rgba(255,255,255,0.65) !important;
+  border-color: rgba(196,181,253,0.3) !important;
+  width: 100% !important;
+  display: flex !important;
+  box-sizing: border-box !important;
+}
+.light-mode button[style*="rgba(255,255,255,0.04)"] p { color: #1e1b4b !important; }
+.light-mode button[style*="rgba(255,255,255,0.04)"] p.text-gray-500 { color: #9ca3af !important; }
+.light-mode button[style*="rgba(255,255,255,0.04)"] span.text-gray-400 { color: #9ca3af !important; }
+
+/* Active category button */
+.light-mode button[style*="linear-gradient(135deg, rgba(124,58,237"] {
+  background: linear-gradient(135deg, rgba(124,58,237,0.18), rgba(219,39,119,0.1)) !important;
+  border-color: rgba(124,58,237,0.5) !important;
+}
+
+/* ── Category feedback panel header ── */
+.light-mode [style*="rgba(255,255,255,0.04)"].px-5.py-4 {
+  background: rgba(237,233,254,0.55) !important;
+  border-bottom-color: rgba(196,181,253,0.3) !important;
+}
+.light-mode [style*="rgba(255,255,255,0.04)"].px-5.py-4 h3 { color: #1e1b4b !important; }
+.light-mode [style*="rgba(255,255,255,0.04)"].px-5.py-4 p  { color: #9ca3af !important; }
+
+/* ── Empty state boxes ── */
+.light-mode [style*="rgba(255,255,255,0.04)"] p.text-gray-400 { color: #6b7280 !important; }
+.light-mode [style*="rgba(255,255,255,0.04)"] p.text-gray-600 { color: #9ca3af !important; }
+.light-mode [style*="rgba(255,255,255,0.04)"].bg-white\/5 {
+  background: rgba(237,233,254,0.4) !important;
+  border-color: rgba(196,181,253,0.25) !important;
+}
+
+/* ── Modals — override dark gradient bg ── */
+.light-mode [style*="linear-gradient(145deg, #1a1025"] {
+  background: rgba(255,255,255,0.96) !important;
+  border-color: rgba(196,181,253,0.5) !important;
+  box-shadow: 0 25px 60px rgba(109,40,217,0.15), 0 0 0 1px rgba(196,181,253,0.3) !important;
+}
+
+/* Modal header */
+.light-mode [style*="linear-gradient(145deg, #1a1025"] .border-b { border-color: rgba(196,181,253,0.25) !important; }
+.light-mode [style*="linear-gradient(145deg, #1a1025"] h2 { color: #1e1b4b !important; }
+.light-mode [style*="linear-gradient(145deg, #1a1025"] p.text-gray-400 { color: #6b7280 !important; }
+.light-mode [style*="linear-gradient(145deg, #1a1025"] p.text-gray-500 { color: #9ca3af !important; }
+
+/* Modal info grid fields */
+.light-mode [style*="linear-gradient(145deg, #1a1025"] [style*="rgba(255,255,255,0.04)"] {
+  background: rgba(237,233,254,0.45) !important;
+  border-color: rgba(196,181,253,0.3) !important;
+}
+.light-mode [style*="linear-gradient(145deg, #1a1025"] [style*="rgba(255,255,255,0.04)"] p.text-white    { color: #1e1b4b !important; }
+.light-mode [style*="linear-gradient(145deg, #1a1025"] [style*="rgba(255,255,255,0.04)"] p.text-gray-200 { color: #374151 !important; }
+.light-mode [style*="linear-gradient(145deg, #1a1025"] [style*="rgba(255,255,255,0.04)"] p.text-gray-400 { color: #6b7280 !important; }
+.light-mode [style*="linear-gradient(145deg, #1a1025"] [style*="rgba(255,255,255,0.04)"] p.text-gray-500 { color: #9ca3af !important; }
+
+/* Modal select + textarea */
+.light-mode [style*="linear-gradient(145deg, #1a1025"] select[style*="rgba(255,255,255,0.08)"] {
+  background: rgba(255,255,255,0.8) !important;
+  border-color: rgba(196,181,253,0.4) !important;
+  color: #1e1b4b !important;
+}
+.light-mode [style*="linear-gradient(145deg, #1a1025"] textarea[style*="rgba(255,255,255,0.06)"] {
+  background: rgba(255,255,255,0.75) !important;
+  border-color: rgba(196,181,253,0.35) !important;
+  color: #1e1b4b !important;
+}
+.light-mode [style*="linear-gradient(145deg, #1a1025"] textarea::placeholder { color: #9ca3af !important; }
+
+/* Modal close button */
+.light-mode [style*="linear-gradient(145deg, #1a1025"] button.text-gray-400 { color: #9ca3af !important; }
+.light-mode [style*="linear-gradient(145deg, #1a1025"] button.text-gray-300 { color: #6b7280 !important; }
+
+/* Modal cancel/close button bg */
+.light-mode [style*="linear-gradient(145deg, #1a1025"] button[style*="rgba(255,255,255,0.06)"] {
+  background: rgba(237,233,254,0.5) !important;
+  border-color: rgba(196,181,253,0.4) !important;
+  color: #4c1d95 !important;
+}
+
+/* ── Status history entries ── */
+.light-mode [style*="linear-gradient(145deg, #1a1025"] .text-white.text-sm.font-semibold { color: #1e1b4b !important; }
+.light-mode [style*="linear-gradient(145deg, #1a1025"] .text-gray-400.text-sm { color: #6b7280 !important; }
+.light-mode [style*="linear-gradient(145deg, #1a1025"] .text-gray-500.text-xs { color: #9ca3af !important; }
+.light-mode [style*="linear-gradient(145deg, #1a1025"] .text-gray-600 { color: #9ca3af !important; }
+
+/* ── NEW badge ── */
+.light-mode span.bg-red-500.text-white { background: #dc2626 !important; color: #ffffff !important; }
+
+/* ── Date range inputs ── */
+.light-mode input[type="date"].bg-white\/10 {
+  background: rgba(255,255,255,0.8) !important;
+  border-color: rgba(196,181,253,0.4) !important;
+  color: #1e1b4b !important;
+  color-scheme: light;
+}
+
+/* ── "Date filtered" pill ── */
+.light-mode .bg-violet-500\/20 {
+  background: rgba(139,92,246,0.15) !important;
+  border-color: rgba(139,92,246,0.3) !important;
+}
+
+/* ── Student detail modal feedback stats cards ── */
+.light-mode [style*="linear-gradient(145deg, #1a1025"] .border-white\/10[style*="rgba(255,255,255,0.04)"] {
+  background: rgba(237,233,254,0.45) !important;
+  border-color: rgba(196,181,253,0.3) !important;
+}
+.light-mode [style*="linear-gradient(145deg, #1a1025"] .text-2xl.font-bold.text-white { color: #1e1b4b !important; }
+
+/* ===================================
+   LIGHT MODE — REPORTS & ANALYTICS PAGE
+   =================================== */
+
+/* ── Page text ── */
+.light-mode .reports-page h1,
+.light-mode .reports-page h2       { color: #1e1b4b !important; }
+.light-mode .reports-page p        { color: #374151 !important; }
+
+/* ── Chart card panels ── */
+.light-mode .reports-chart-card {
+  background: rgba(255,255,255,0.75) !important;
+  border-color: rgba(196,181,253,0.4) !important;
+  box-shadow: 0 4px 20px rgba(109,40,217,0.08) !important;
+}
+.light-mode .reports-chart-card h2 { color: #1e1b4b !important; }
+.light-mode .reports-chart-card p  { color: #6b7280 !important; }
+
+/* ── Radar axis labels ── */
+.light-mode .reports-page .recharts-polar-angle-axis-tick text,
+.light-mode .reports-page .recharts-text { fill: #1e1b4b !important; }
+
+/* ── Radar grid lines ── */
+.light-mode .reports-page .recharts-polar-grid-angle line,
+.light-mode .reports-page .recharts-polar-grid-concentric-polygon { stroke: rgba(109,40,217,0.25) !important; }
+
+/* ── Legend dots labels ── */
+.light-mode .legend-dot-label { color: #1e1b4b !important; }
+
+/* ── Timeline labels & values ── */
+.light-mode .timeline-status-label { color: #1e1b4b !important; }
+.light-mode .timeline-status-value { color: #111827 !important; }
+.light-mode .timeline-pct-label    { color: #374151 !important; }
+
+/* ── Timeline track background ── */
+.light-mode .timeline-track { background: rgba(109,40,217,0.1) !important; }
+
+/* ── Timeline vertical line ── */
+.light-mode .timeline-vline { background: rgba(109,40,217,0.15) !important; }
+
+/* ── Total submissions pill ── */
+.light-mode .timeline-total {
+  background: rgba(237,233,254,0.7) !important;
+  border-color: rgba(196,181,253,0.4) !important;
+}
+.light-mode .timeline-total span { color: #1e1b4b !important; }
+
+/* ── Category breakdown table ── */
+.light-mode .reports-chart-card table thead tr {
+  background: rgba(237,233,254,0.6) !important;
+  border-bottom-color: rgba(196,181,253,0.4) !important;
+}
+.light-mode .reports-chart-card table thead th { color: #4c1d95 !important; }
+.light-mode .reports-chart-card table tbody tr {
+  border-bottom: 1px solid rgba(0,0,0,0.1) !important;
+}
+.light-mode .reports-chart-card table tbody tr:hover {
+  background: rgba(237,233,254,0.35) !important;
+}
+.light-mode .reports-chart-card table tbody td span.text-white,
+.light-mode .reports-chart-card table tbody td span { color: #1e1b4b !important; }
+.light-mode .reports-chart-card table tbody td .text-white { color: #1e1b4b !important; }
+.light-mode .reports-chart-card table tbody td .text-gray-400 { color: #6b7280 !important; }
+
+/* ── Share bar track ── */
+.light-mode .share-bar-track { background: rgba(109,40,217,0.1) !important; }
+
+/* ── Category icon box ── */
+.light-mode .cat-icon-box { opacity: 0.9; }
+
+/* ── "X total" label in table header ── */
+.light-mode .reports-chart-card .text-gray-500 { color: #6b7280 !important; }
+
+/* ── Header border in breakdown table ── */
+.light-mode .reports-chart-card .border-b { border-color: rgba(196,181,253,0.3) !important; }
+
+/* ===================================
+   LIGHT MODE — REPORTS METRIC CARDS
+   Keep all text WHITE on colored gradient backgrounds
+   =================================== */
+
+.light-mode .reports-page .rounded-xl[style*="linear-gradient"] *,
+.light-mode .reports-page .rounded-xl[style*="linear-gradient"] p,
+.light-mode .reports-page .rounded-xl[style*="linear-gradient"] span {
+  color: #ffffff !important;
+}
+
+/* ===================================
+   LIGHT MODE — FEEDBACK MODAL (two-column version)
+   Targets the modal with maxWidth:1000px / two-col layout
+   =================================== */
+
+/* Modal wrapper — override dark gradient */
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] {
+  background: rgba(245,243,255,0.97) !important;
+  border-color: rgba(196,181,253,0.5) !important;
+  box-shadow: 0 25px 60px rgba(109,40,217,0.15), 0 0 0 1px rgba(196,181,253,0.3) !important;
+}
+
+/* Header */
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] h2 { color: #1e1b4b !important; }
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] p  { color: #6b7280 !important; }
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .border-b,
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .divide-x > * {
+  border-color: rgba(196,181,253,0.25) !important;
+}
+
+/* Info chips (rounded-lg cards) */
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .rounded-lg[style*="rgba(255,255,255,0.04)"],
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .rounded-lg[style*="rgba(255,255,255,0.08)"] {
+  background: rgba(109,40,217,0.06) !important;
+  border: 1.5px solid #c4b5fd !important;
+}
+
+/* All text inside info chips */
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .rounded-lg p.text-white,
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .rounded-lg p.text-gray-200,
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .rounded-lg span.text-white { color: #1e1b4b !important; }
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .rounded-lg p.text-gray-500 { color: #4c1d95 !important; }
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .rounded-lg p.text-gray-400 { color: #6b7280 !important; }
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .rounded-lg span.text-gray-500 { color: #9ca3af !important; }
+
+/* Status history text */
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] span.text-white { color: #1e1b4b !important; }
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] span.text-gray-500 { color: #9ca3af !important; }
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] p.text-gray-400 { color: #6b7280 !important; }
+
+/* Right panel background */
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .w-72 {
+  background: rgba(237,233,254,0.4) !important;
+}
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .w-72 p { color: #4c1d95 !important; }
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .w-72 .text-gray-400 { color: #4c1d95 !important; }
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .w-72 .text-gray-500 { color: #6b7280 !important; }
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .w-72 .text-gray-600 { color: #9ca3af !important; }
+
+/* Current status chip in right panel */
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .w-72 [style*="rgba(255,255,255,0.04)"] {
+  background: rgba(255,255,255,0.7) !important;
+  border-color: rgba(196,181,253,0.4) !important;
+}
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .w-72 [style*="rgba(255,255,255,0.04)"] p { color: #6b7280 !important; }
+
+/* Textarea */
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] textarea {
+  background: rgba(255,255,255,0.8) !important;
+  border-color: rgba(196,181,253,0.4) !important;
+  color: #1e1b4b !important;
+}
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] textarea::placeholder { color: #9ca3af !important; }
+
+/* Close button */
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] button[style*="rgba(255,255,255,0.06)"] {
+  background: rgba(237,233,254,0.6) !important;
+  border-color: rgba(196,181,253,0.4) !important;
+  color: #4c1d95 !important;
+}
+
+/* X button */
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] button.text-gray-400 { color: #9ca3af !important; }
+
+/* ── Handled By column — light mode text fix ── */
+.light-mode .handled-by-name { color: #111827 !important; }
+.light-mode .handled-by-role { color: #6b7280 !important; }
