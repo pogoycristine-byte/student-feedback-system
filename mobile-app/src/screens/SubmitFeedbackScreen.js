@@ -13,7 +13,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { categoryAPI, feedbackAPI } from '../services/api';
 
 const SubmitFeedbackScreen = ({ navigation }) => {
@@ -21,27 +23,30 @@ const SubmitFeedbackScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [mediaFiles, setMediaFiles] = useState([]);
-  const [isAnonymous, setIsAnonymous] = useState(false); // ← NEW: Anonymous toggle
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
   const [formData, setFormData] = useState({
     category: '',
     subject: '',
     teacherName: '',
     description: '',
-    priority: 'Medium', // Keep for backend, but don't show to user
+    priority: 'Medium',
     location: 'TMC Main Campus',
     dateTime: '',
   });
 
   useEffect(() => {
     fetchCategories();
-    // Set initial date/time
-    updateDateTime();
+    const now = new Date();
+    setSelectedDate(now);
+    formatAndSetDateTime(now);
   }, []);
 
-  const updateDateTime = () => {
-    const now = new Date();
-    const formatted = now.toLocaleString('en-US', {
+  const formatAndSetDateTime = (date) => {
+    const formatted = date.toLocaleString('en-US', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -57,7 +62,6 @@ const SubmitFeedbackScreen = ({ navigation }) => {
       const response = await categoryAPI.getAll();
       const cats = response.data.categories;
 
-      // ── Pin "Suggestions" to the top, keep all others in original order ──
       const sorted = [...cats].sort((a, b) => {
         const aIsSuggestion = a.name?.toLowerCase().trim() === 'suggestions';
         const bIsSuggestion = b.name?.toLowerCase().trim() === 'suggestions';
@@ -145,10 +149,9 @@ const SubmitFeedbackScreen = ({ navigation }) => {
     }
     setSubmitting(true);
     try {
-      // Add date/time and anonymous flag to form data
       const submissionData = {
         ...formData,
-        isAnonymous: isAnonymous, // ← NEW: Send anonymous flag to backend
+        isAnonymous: isAnonymous,
         submittedAt: getCurrentDateTime(),
       };
 
@@ -162,6 +165,9 @@ const SubmitFeedbackScreen = ({ navigation }) => {
         {
           text: 'OK',
           onPress: () => {
+            const now = new Date();
+            setSelectedDate(now);
+            formatAndSetDateTime(now);
             setFormData({
               category: categories[0]?._id || '',
               subject: '',
@@ -172,7 +178,7 @@ const SubmitFeedbackScreen = ({ navigation }) => {
               dateTime: '',
             });
             setMediaFiles([]);
-            setIsAnonymous(false); // ← NEW: Reset anonymous toggle
+            setIsAnonymous(false);
             navigation.goBack();
           },
         },
@@ -187,6 +193,28 @@ const SubmitFeedbackScreen = ({ navigation }) => {
       Alert.alert('🔴 Error Details', JSON.stringify(errorDetails, null, 2));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const onDateChange = (event, selectedDateValue) => {
+    setShowDatePicker(false);
+    if (selectedDateValue) {
+      const newDate = new Date(selectedDateValue);
+      newDate.setHours(selectedDate.getHours());
+      newDate.setMinutes(selectedDate.getMinutes());
+      setSelectedDate(newDate);
+      formatAndSetDateTime(newDate);
+    }
+  };
+
+  const onTimeChange = (event, selectedTimeValue) => {
+    setShowTimePicker(false);
+    if (selectedTimeValue) {
+      const newTime = new Date(selectedDate);
+      newTime.setHours(selectedTimeValue.getHours());
+      newTime.setMinutes(selectedTimeValue.getMinutes());
+      setSelectedDate(newTime);
+      formatAndSetDateTime(newTime);
     }
   };
 
@@ -232,7 +260,7 @@ const SubmitFeedbackScreen = ({ navigation }) => {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.form}>
 
-          {/* ═══ NEW: ANONYMOUS TOGGLE ═══ */}
+          {/* Anonymous Toggle */}
           <View style={styles.anonymousCard}>
             <View style={styles.anonymousHeader}>
               <Text style={styles.anonymousIcon}>🕵️</Text>
@@ -261,7 +289,6 @@ const SubmitFeedbackScreen = ({ navigation }) => {
               </View>
             )}
           </View>
-          {/* ═══ END ANONYMOUS TOGGLE ═══ */}
 
           <Text style={styles.label}>Category (Required)</Text>
           <View style={styles.pickerContainer}>
@@ -291,15 +318,46 @@ const SubmitFeedbackScreen = ({ navigation }) => {
             </Picker>
           </View>
 
+          {/* Date & Time with Icons Inside Input - White background */}
           <Text style={styles.label}>Date & Time of Class (Required)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g., 02/20/2026, 10:30 AM"
-            placeholderTextColor="#999"
-            value={formData.dateTime}
-            onChangeText={(text) => setFormData((prev) => ({ ...prev, dateTime: text }))}
-          />
-          <Text style={styles.helperText}>Enter the date and time when the class occurred</Text>
+          <View style={styles.inputWithIcons}>
+            <TextInput
+              style={styles.inputWithIconsField}
+              placeholder="Select date and time"
+              placeholderTextColor="#999"
+              value={formData.dateTime}
+              editable={false}
+            />
+            <TouchableOpacity style={styles.iconInside} onPress={() => setShowDatePicker(true)}>
+              <Text style={styles.iconInsideText}>📅</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconInside} onPress={() => setShowTimePicker(true)}>
+              <Text style={styles.iconInsideText}>⏰</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.helperText}>Select date and time when the class occurred</Text>
+
+          {/* Date Picker */}
+          {showDatePicker && (
+            <DateTimePicker
+              value={selectedDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={onDateChange}
+              minimumDate={new Date(2000, 0, 1)}
+              maximumDate={new Date(2030, 11, 31)}
+            />
+          )}
+
+          {/* Time Picker */}
+          {showTimePicker && (
+            <DateTimePicker
+              value={selectedDate}
+              mode="time"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={onTimeChange}
+            />
+          )}
 
           <Text style={styles.label}>Subject/Class (Required)</Text>
           <TextInput
@@ -318,8 +376,6 @@ const SubmitFeedbackScreen = ({ navigation }) => {
             value={formData.teacherName}
             onChangeText={(text) => setFormData((prev) => ({ ...prev, teacherName: text }))}
           />
-
-          {/* PRIORITY REMOVED - Still sends "Medium" to backend but user doesn't see it */}
 
           <Text style={styles.label}>Description (Required, min 10 characters)</Text>
           <TextInput
@@ -412,7 +468,7 @@ const styles = StyleSheet.create({
   content: { flex: 1, paddingHorizontal: 24, paddingTop: 16 },
   form: { width: '100%' },
   
-  // ═══ NEW: ANONYMOUS STYLES ═══
+  // Anonymous Styles
   anonymousCard: {
     backgroundColor: '#f8f4ff',
     borderRadius: 12,
@@ -461,7 +517,35 @@ const styles = StyleSheet.create({
     color: '#6D28D9',
     lineHeight: 16,
   },
-  // ═══ END ANONYMOUS STYLES ═══
+  
+  // Input with Icons Inside - White background
+  inputWithIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  inputWithIconsField: {
+    flex: 1,
+    padding: 12,
+    color: '#1a1a2e',
+    fontSize: 15,
+    backgroundColor: '#fff',
+  },
+  iconInside: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    borderLeftWidth: 1,
+    borderLeftColor: '#e0e0e0',
+  },
+  iconInsideText: {
+    fontSize: 18,
+  },
   
   label: { fontSize: 13, color: '#1a1a2e', marginBottom: 6, fontWeight: '600' },
   helperText: { 
@@ -488,7 +572,7 @@ const styles = StyleSheet.create({
     marginBottom: 12, 
     borderWidth: 1, 
     borderColor: '#e0e0e0',
-    overflow: 'hidden' // Ensures border radius clips the picker
+    overflow: 'hidden'
   },
   picker: { 
     color: '#1a1a2e', 
@@ -497,7 +581,7 @@ const styles = StyleSheet.create({
   pickerItem: {
     fontSize: 15,
     color: '#1a1a2e',
-    borderRadius: 8, // Smooth rounded items in dropdown
+    borderRadius: 8,
   },
   uploadButton: { 
     backgroundColor: '#f8f4ff', 

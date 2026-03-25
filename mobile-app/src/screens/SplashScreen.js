@@ -168,7 +168,7 @@ const SplashScreen = ({ onFinish }) => {
         transform: [{ translateX: gradientX }, { translateY: gradientY }, { rotate: rotateInterpolation }],
       }]}>
         <LinearGradient
-          colors={['#1a0b2e','#8B5CF6','#EC4899','#8B5CF6','#2d1b4e','#1a0b2e']}
+          colors={['#1a0b2e','#310b8a','#9e0954','#28037e','#2d1b4e','#1a0b2e']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={{ width: width * 4, height: height * 4 }}
         />
@@ -190,7 +190,7 @@ const SplashScreen = ({ onFinish }) => {
             transform: [{ translateY: iconFloat }, { scale: iconScale }],
           }]}>
             <LottieView
-              source={require('../../assets/Gibli Tribute.json')}
+              source={require('../../assets/shopping cart.json')}
               autoPlay
               loop
               style={styles.lottie}
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
   },
   middleSpace: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   lottieWrapper: { alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  lottie: { width: 360, height: 360 },
+  lottie: { width: 250, height: 250 },
   iconLabel: {
     fontSize: 13, color: 'rgba(255,255,255,0.6)',
     letterSpacing: 1.5, textTransform: 'uppercase',

@@ -60,36 +60,15 @@ const STATUS_STYLES = {
 
 const STATUS_TABS = ['All', 'Pending', 'Under Review', 'Resolved', 'Rejected'];
 
-const buildActivityLog = (feedback) => {
-  const log = [];
-  log.push({
-    type: 'submitted', icon: '📝', color: '#8B5CF6',
-    label: 'Feedback submitted',
-    by: feedback.student?.name || 'Student', role: 'student',
-    at: feedback.createdAt,
-  });
-  if (feedback.statusHistory && feedback.statusHistory.length > 0) {
-    feedback.statusHistory.forEach(h => {
-      const statusColors = { Pending: '#F59E0B', 'Under Review': '#3B82F6', Resolved: '#10B981', Rejected: '#EF4444' };
-      log.push({
-        type: 'status',
-        icon: h.status === 'Resolved' ? '✅' : h.status === 'Rejected' ? '❌' : h.status === 'Under Review' ? '👀' : '🔄',
-        color: statusColors[h.status] || '#6B7280',
-        label: `Status changed to ${h.status}`,
-        by: h.changedBy?.name || 'Admin', role: h.changedBy?.role || 'admin',
-        comment: h.comment || '', at: h.changedAt,
-      });
-    });
+const resolveChangedBy = (changedBy) => {
+  if (!changedBy) return { name: 'Unknown', role: 'admin' };
+  if (typeof changedBy === 'object') {
+    return {
+      name: changedBy.name || changedBy.username || changedBy.email || 'Unknown',
+      role: changedBy.role || 'admin',
+    };
   }
-  if (feedback.satisfactionRating && feedback.ratedAt) {
-    log.push({
-      type: 'rating', icon: '⭐', color: '#F59E0B',
-      label: `Rated ${feedback.satisfactionRating}/5`,
-      by: feedback.student?.name || 'Student', role: 'student',
-      comment: feedback.satisfactionComment || '', at: feedback.ratedAt,
-    });
-  }
-  return log.sort((a, b) => new Date(b.at) - new Date(a.at));
+  return { name: 'Unknown', role: 'admin' };
 };
 
 const FeedbackManagement = () => {
@@ -108,8 +87,6 @@ const FeedbackManagement = () => {
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [templates, setTemplates] = useState([]);
-  const [activityLog, setActivityLog] = useState([]);
-  const [loadingMessages, setLoadingMessages] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -199,16 +176,6 @@ const FeedbackManagement = () => {
     setAdminComment(item.adminResponse?.comment || '');
     setShowModal(true);
     setTemplates(getTemplates());
-    setLoadingMessages(true);
-    try {
-      const msgRes = await feedbackAPI.getMessages(item._id);
-      const messages = msgRes.data.messages || [];
-      setActivityLog(buildActivityLog({ ...item, messages }));
-    } catch {
-      setActivityLog(buildActivityLog(item));
-    } finally {
-      setLoadingMessages(false);
-    }
   };
 
   const handleChatClick = async (item) => {
@@ -218,7 +185,14 @@ const FeedbackManagement = () => {
       if (messages.length > 0) markChatRead(item._id, messages[messages.length - 1]._id);
     } catch {}
     setUnreadChats(prev => { const next = new Set(prev); next.delete(item._id); return next; });
-    navigate(`/feedback/${item._id}/chat`);
+    
+    // Pass anonymous info to the chat page
+    navigate(`/feedback/${item._id}/chat`, { 
+      state: { 
+        isAnonymous: item.isAnonymous,
+        studentName: item.student?.name 
+      } 
+    });
   };
 
   const handleUpdateStatus = async () => {
@@ -441,7 +415,7 @@ const FeedbackManagement = () => {
               {['Student', 'Subject', 'Category', ...(isAdmin ? ['Handled By'] : []), 'Status', 'Date', 'Actions'].map(h => (
                 <th key={h} className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{h}</th>
               ))}
-            </tr>
+             </tr>
           </thead>
           <tbody>
             {filteredFeedback.length === 0 ? (
@@ -464,6 +438,7 @@ const FeedbackManagement = () => {
                 const dueBadge = dueStatus ? DUE_BADGE[dueStatus] : null;
                 return (
                   <tr key={item._id} className="group transition-all hover:bg-white/[0.04]" style={{ borderBottom: '1px solid rgba(0,0,0,0.25)' }}>
+                    {/* ── Student: masked for staff when isAnonymous, visible to admin ── */}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         {showNew && (
@@ -473,8 +448,22 @@ const FeedbackManagement = () => {
                           </div>
                         )}
                         <div>
-                          <p className="text-white text-sm font-semibold">{item.student?.name}</p>
-                          <p className="text-gray-500 text-xs">{item.student?.studentId}</p>
+                          {item.isAnonymous && !isAdmin ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-gray-400 text-sm font-semibold italic">Anonymous</span>
+                              <span className="text-[9px] bg-gray-500/20 text-gray-400 border border-gray-500/30 px-1.5 py-0.5 rounded-full font-semibold">🕵️ Hidden</span>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-white text-sm font-semibold">{item.student?.name}</p>
+                                {item.isAnonymous && isAdmin && (
+                                  <span className="text-[9px] bg-violet-500/20 text-violet-300 border border-violet-500/30 px-1.5 py-0.5 rounded-full font-semibold">🕵️ Anon</span>
+                                )}
+                              </div>
+                              <p className="text-gray-500 text-xs">{item.student?.studentId}</p>
+                            </>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -575,7 +564,13 @@ const FeedbackManagement = () => {
               <div className="flex-1 overflow-y-auto p-4 space-y-2 min-w-0">
                 <div className="grid grid-cols-2 gap-1.5">
                   {[
-                    { label: 'Student',    value: selectedFeedback.student?.name, sub: selectedFeedback.student?.studentId },
+                    // ── Student: masked for staff when isAnonymous, visible to admin ──
+                    {
+                      label: 'Student',
+                      value: selectedFeedback.isAnonymous && !isAdmin ? 'Anonymous Student' : selectedFeedback.student?.name,
+                      sub: selectedFeedback.isAnonymous && !isAdmin ? null : selectedFeedback.student?.studentId,
+                      badge: selectedFeedback.isAnonymous ? (isAdmin ? '🕵️ Submitted Anonymously' : '🕵️ Anonymous') : null,
+                    },
                     { label: 'Subject',    value: selectedFeedback.subject },
                     { label: 'Category',   value: `${selectedFeedback.category?.icon || ''} ${selectedFeedback.category?.name || ''}` },
                     selectedFeedback.teacherName ? { label: 'Teacher', value: selectedFeedback.teacherName } : { label: 'Priority', value: selectedFeedback.priority },
@@ -635,52 +630,6 @@ const FeedbackManagement = () => {
                     )}
                   </div>
                 )}
-
-                {isAdmin && (
-                  <div>
-                    <p className="text-[9px] uppercase tracking-widest font-semibold mb-2" style={{ color: isLightMode ? '#4c1d95' : '#6b7280' }}>Activity Log</p>
-                    {loadingMessages ? (
-                      <div className="flex items-center gap-2 px-3 py-4">
-                        <div className="w-4 h-4 rounded-full border-2 border-violet-500/30 border-t-violet-500 animate-spin" />
-                        <span className="text-xs text-gray-500">Loading activity...</span>
-                      </div>
-                    ) : activityLog.length === 0 ? (
-                      <p className="text-xs text-gray-600 px-3">No activity yet.</p>
-                    ) : (
-                      <div className="relative">
-                        <div className="absolute left-4 top-0 bottom-0 w-px" style={{ background: isLightMode ? 'rgba(196,181,253,0.4)' : 'rgba(255,255,255,0.08)' }} />
-                        <div className="space-y-0">
-                          {activityLog.map((entry, i) => (
-                            <div key={i} className="flex items-start gap-3 pl-2 pb-3 relative">
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 z-10 text-xs"
-                                style={{ background: `${entry.color}22`, border: `1.5px solid ${entry.color}55`, marginTop: 2 }}>
-                                <span style={{ fontSize: 11 }}>{entry.icon}</span>
-                              </div>
-                              <div className="flex-1 min-w-0 rounded-lg px-2.5 py-2" style={{ background: isLightMode ? 'rgba(109,40,217,0.04)' : 'rgba(255,255,255,0.03)', border: isLightMode ? '1px solid rgba(196,181,253,0.2)' : '1px solid rgba(255,255,255,0.06)' }}>
-                                <div className="flex items-center justify-between gap-2 flex-wrap">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-xs font-semibold" style={{ color: isLightMode ? '#1e1b4b' : '#ffffff' }}>{entry.label}</span>
-                                    {entry.role && (
-                                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium capitalize"
-                                        style={{ background: entry.role === 'student' ? 'rgba(139,92,246,0.15)' : 'rgba(16,185,129,0.15)', color: entry.role === 'student' ? '#a78bfa' : '#34d399' }}>
-                                        {entry.role}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="text-[10px] tabular-nums shrink-0" style={{ color: '#6b7280' }}>
-                                    {new Date(entry.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {new Date(entry.at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                                  </span>
-                                </div>
-                                <p className="text-[11px] mt-0.5" style={{ color: isLightMode ? '#6b7280' : '#9ca3af' }}>by {entry.by}</p>
-                                {entry.comment && <p className="text-xs mt-1 italic" style={{ color: isLightMode ? '#4b5563' : '#d1d5db' }}>"{entry.comment}"</p>}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* RIGHT */}
@@ -702,7 +651,7 @@ const FeedbackManagement = () => {
                   </div>
                   <div className="mb-2">
                     <p className="text-[9px] uppercase tracking-widest font-semibold mb-1" style={{ color: isLightMode ? '#4c1d95' : '#6b7280' }}>
-                      Admin Response <span className="normal-case" style={{ color: isLightMode ? '#9ca3af' : '#4b5563' }}>· sent to chat</span>
+                      {user?.role === 'staff' ? 'Staff Response' : 'Admin Response'} <span className="normal-case" style={{ color: isLightMode ? '#9ca3af' : '#4b5563' }}>· sent to chat</span>
                     </p>
                     <textarea
                       className="w-full px-3 py-2 rounded-lg text-white text-sm placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all resize-none"

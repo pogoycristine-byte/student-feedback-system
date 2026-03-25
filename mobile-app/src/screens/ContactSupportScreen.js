@@ -14,7 +14,7 @@ const ContactSupportScreen = ({ navigation }) => {
     }
     setLoading(true);
     try {
-      // TODO: call your API to send support message
+      // huhays call your API to send support message
       // await supportAPI.send({ subject, message });
       Alert.alert('Message Sent!', 'Our support team will get back to you shortly.', [
         { text: 'OK', onPress: () => navigation.goBack() },

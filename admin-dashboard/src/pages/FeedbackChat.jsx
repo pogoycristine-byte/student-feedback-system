@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { feedbackAPI } from '../services/api';
 import { ArrowLeft, Send, MapPin, Calendar, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 const FeedbackChat = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
   const [feedback, setFeedback] = useState(null);
@@ -14,6 +15,9 @@ const FeedbackChat = () => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // Get anonymous flag from location state
+  const isAnonymous = location.state?.isAnonymous || false;
 
   useEffect(() => {
     fetchMessages();
@@ -63,6 +67,22 @@ const FeedbackChat = () => {
     return 'Student';
   };
 
+  const getSenderDisplayName = (sender, senderRole) => {
+    // If feedback is anonymous and sender is student, show "Anonymous Student"
+    if (isAnonymous && senderRole === 'student') {
+      return 'Anonymous Student';
+    }
+    // If sender is staff, show "Staff"
+    if (senderRole === 'staff') {
+      return 'Staff';
+    }
+    // If sender is admin, show "Admin"
+    if (senderRole === 'admin') {
+      return 'Admin';
+    }
+    return sender?.name || 'Unknown';
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -84,7 +104,7 @@ const FeedbackChat = () => {
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-white">{feedback?.subject}</h1>
           <p className="text-gray-400 text-sm">
-            Student: {feedback?.student?.name} ({feedback?.student?.studentId}) • Status: {feedback?.status}
+            Student: {isAnonymous ? 'Anonymous Student' : feedback?.student?.name} ({!isAnonymous && feedback?.student?.studentId}) • Status: {feedback?.status}
           </p>
           <div className="flex flex-wrap gap-4 mt-2">
             {feedback?.location && (
@@ -121,6 +141,7 @@ const FeedbackChat = () => {
               // My own messages go right, everyone else goes left
               const isMyMessage = msg.sender?._id === user?._id || msg.sender?._id === user?.id;
               const roleLabel = getRoleLabel(msg.senderRole);
+              const senderDisplayName = getSenderDisplayName(msg.sender, msg.senderRole);
 
               return (
                 <div
@@ -135,7 +156,7 @@ const FeedbackChat = () => {
                     }`}
                   >
                     <p className={`text-xs mb-1 ${isMyMessage ? 'opacity-80' : 'opacity-70'}`}>
-                      {msg.sender?.name} • {roleLabel}
+                      {senderDisplayName} • {roleLabel}
                     </p>
                     <p className="text-sm leading-relaxed">{msg.message}</p>
                     <p className={`text-xs mt-1 ${isMyMessage ? 'opacity-80' : 'opacity-50'}`}>

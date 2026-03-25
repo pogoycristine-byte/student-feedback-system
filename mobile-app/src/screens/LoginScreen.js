@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,21 +11,27 @@ import {
   ScrollView,
   Modal,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api'; // ← NEW
+import api from '../services/api';
+
+const REMEMBER_KEY = 'classback_remember_me';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const { login } = useAuth();
 
   // Forgot password states
   const [showForgotModal, setShowForgotModal] = useState(false);
-  const [forgotStep, setForgotStep] = useState(1); // 1=email, 2=code, 3=new password
+  const [forgotStep, setForgotStep] = useState(1);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotCode, setForgotCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -34,7 +40,23 @@ const LoginScreen = ({ navigation }) => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // ── Password strength helpers (same as RegisterScreen) ──
+  // ── Load remembered credentials on mount ──
+  useEffect(() => {
+    const loadRemembered = async () => {
+      try {
+        const saved = await AsyncStorage.getItem(REMEMBER_KEY);
+        if (saved) {
+          const { savedEmail, savedPassword } = JSON.parse(saved);
+          setEmail(savedEmail || '');
+          setPassword(savedPassword || '');
+          setRememberMe(true);
+        }
+      } catch (_) {}
+    };
+    loadRemembered();
+  }, []);
+
+  // ── Password strength helpers ──
   const validatePassword = (pw) => ({
     hasUpper: /[A-Z]/.test(pw),
     hasLower: /[a-z]/.test(pw),
@@ -49,13 +71,23 @@ const LoginScreen = ({ navigation }) => {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
-
     setLoading(true);
     const result = await login(email, password);
     setLoading(false);
 
     if (!result.success) {
       Alert.alert('Login Failed', result.message);
+    } else {
+      try {
+        if (rememberMe) {
+          await AsyncStorage.setItem(
+            REMEMBER_KEY,
+            JSON.stringify({ savedEmail: email, savedPassword: password })
+          );
+        } else {
+          await AsyncStorage.removeItem(REMEMBER_KEY);
+        }
+      } catch (_) {}
     }
   };
 
@@ -154,15 +186,18 @@ const LoginScreen = ({ navigation }) => {
                   Enter your email and we'll send a verification code to reset your password.
                 </Text>
                 <Text style={styles.modalLabel}>EMAIL ADDRESS</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="Enter your email"
-                  placeholderTextColor="#666"
-                  value={forgotEmail}
-                  onChangeText={setForgotEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
+                <View style={styles.modalInputWrap}>
+                  <Ionicons name="mail-outline" size={18} color="#666" style={styles.fieldIcon} />
+                  <TextInput
+                    style={styles.modalInputWithIcon}
+                    placeholder="Enter your email"
+                    placeholderTextColor="#666"
+                    value={forgotEmail}
+                    onChangeText={setForgotEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
                 <TouchableOpacity onPress={handleSendCode} disabled={forgotLoading} style={{ marginTop: 8 }}>
                   <LinearGradient colors={['#8B5CF6', '#EC4899']} style={styles.modalBtn}>
                     {forgotLoading
@@ -216,6 +251,7 @@ const LoginScreen = ({ navigation }) => {
                 <Text style={styles.modalSubtitle}>Create a new password for your account.</Text>
                 <Text style={styles.modalLabel}>NEW PASSWORD</Text>
                 <View style={styles.modalPasswordWrap}>
+                  <Ionicons name="lock-closed-outline" size={18} color="#666" style={styles.fieldIcon} />
                   <TextInput
                     style={styles.modalPasswordInput}
                     placeholder="Enter new password"
@@ -224,12 +260,16 @@ const LoginScreen = ({ navigation }) => {
                     onChangeText={setNewPassword}
                     secureTextEntry={!showNewPassword}
                   />
-                  <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)} style={styles.modalEyeBtn}>
-                    <Text style={styles.eyeIcon}>{showNewPassword ? '🙈' : '👁️'}</Text>
+                  <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)} style={styles.eyeBtn}>
+                    <Ionicons
+                      name={showNewPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color="#666"
+                    />
                   </TouchableOpacity>
                 </View>
 
-                {/* ── Password strength indicator ── */}
+                {/* Password strength indicator */}
                 {newPassword.length > 0 && (
                   <View style={styles.strengthWrap}>
                     <Text style={styles.strengthLabel}>Password strength:</Text>
@@ -256,6 +296,7 @@ const LoginScreen = ({ navigation }) => {
 
                 <Text style={[styles.modalLabel, { marginTop: 10 }]}>CONFIRM PASSWORD</Text>
                 <View style={styles.modalPasswordWrap}>
+                  <Ionicons name="lock-closed-outline" size={18} color="#666" style={styles.fieldIcon} />
                   <TextInput
                     style={styles.modalPasswordInput}
                     placeholder="Confirm new password"
@@ -264,8 +305,12 @@ const LoginScreen = ({ navigation }) => {
                     onChangeText={setConfirmPassword}
                     secureTextEntry={!showConfirmPassword}
                   />
-                  <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.modalEyeBtn}>
-                    <Text style={styles.eyeIcon}>{showConfirmPassword ? '🙈' : '👁️'}</Text>
+                  <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeBtn}>
+                    <Ionicons
+                      name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color="#666"
+                    />
                   </TouchableOpacity>
                 </View>
                 <TouchableOpacity onPress={handleResetPassword} disabled={forgotLoading} style={{ marginTop: 16 }}>
@@ -288,36 +333,45 @@ const LoginScreen = ({ navigation }) => {
       </Modal>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
-        <ScrollView contentContainerStyle={styles.scrollView}>
+        <ScrollView
+          contentContainerStyle={styles.scrollView}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.logoContainer}>
-            <LinearGradient
-              colors={['#8B5CF6', '#EC4899']}
-              style={styles.logoCircle}
-            >
-              <Text style={styles.logoText}>📚</Text>
-            </LinearGradient>
+            {/* Circular Logo Image */}
+            <Image
+              source={require('../../assets/last.png')}
+              style={styles.logoImage}
+            />
             <Text style={styles.title}>ClassBack</Text>
             <Text style={styles.subtitle}>Sign in to your account</Text>
           </View>
 
           <View style={styles.formContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor="#999"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
 
-            {/* Password field with show/hide toggle */}
-            <View style={styles.passwordWrap}>
+            {/* ── Email field with mail icon ── */}
+            <View style={styles.inputWrap}>
+              <Ionicons name="mail-outline" size={18} color="#999" style={styles.fieldIcon} />
               <TextInput
-                style={styles.passwordInput}
+                style={styles.inputWithIcon}
+                placeholder="Email"
+                placeholderTextColor="#999"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+
+            {/* ── Password field with lock icon + eye toggle ── */}
+            <View style={styles.inputWrap}>
+              <Ionicons name="lock-closed-outline" size={18} color="#999" style={styles.fieldIcon} />
+              <TextInput
+                style={styles.inputWithIcon}
                 placeholder="Password"
                 placeholderTextColor="#999"
                 value={password}
@@ -328,17 +382,33 @@ const LoginScreen = ({ navigation }) => {
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeBtn}
               >
-                <Text style={styles.eyeIcon}>{showPassword ? '🙈' : '👁️'}</Text>
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color="#999"
+                />
               </TouchableOpacity>
             </View>
 
-            {/* Forgot Password link */}
-            <TouchableOpacity
-              onPress={() => setShowForgotModal(true)}
-              style={styles.forgotLink}
-            >
-              <Text style={styles.forgotText}>Forgot password?</Text>
-            </TouchableOpacity>
+            {/* ── Remember Me + Forgot Password row ── */}
+            <View style={styles.rememberRow}>
+              <TouchableOpacity
+                style={styles.rememberLeft}
+                onPress={() => setRememberMe(!rememberMe)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+                  {rememberMe && (
+                    <Ionicons name="checkmark" size={12} color="#fff" />
+                  )}
+                </View>
+                <Text style={styles.rememberText}>Remember me</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={() => setShowForgotModal(true)}>
+                <Text style={styles.forgotText}>Forgot password?</Text>
+              </TouchableOpacity>
+            </View>
 
             <TouchableOpacity onPress={handleLogin} disabled={loading}>
               <LinearGradient
@@ -372,40 +442,82 @@ const styles = StyleSheet.create({
   keyboardView: { flex: 1 },
   scrollView: { flexGrow: 1, justifyContent: 'center', padding: 20 },
   logoContainer: { alignItems: 'center', marginBottom: 40 },
-  logoCircle: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-  logoText: { fontSize: 40 },
+  logoImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 20,
+  },
   title: { fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 8 },
   subtitle: { fontSize: 16, color: '#999' },
   formContainer: { width: '100%' },
-  input: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 16, marginBottom: 16, color: '#fff', fontSize: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-  passwordWrap: {
+
+  // ── Shared input wrap ──
+  inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
-    marginBottom: 16,
+    marginBottom: 24,
+    paddingHorizontal: 14,
   },
-  passwordInput: {
+  fieldIcon: {
+    marginRight: 10,
+  },
+  inputWithIcon: {
     flex: 1,
-    padding: 16,
+    paddingVertical: 16,
     color: '#fff',
     fontSize: 16,
   },
   eyeBtn: {
-    paddingHorizontal: 14,
+    paddingLeft: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  eyeIcon: { fontSize: 18 },
-  forgotLink: { alignItems: 'flex-end', marginBottom: 16, marginTop: -8 },
+
+  // ── Remember Me + Forgot row ──
+  rememberRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    marginTop: -4,
+  },
+  rememberLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#8B5CF6',
+    borderColor: '#8B5CF6',
+  },
+  rememberText: {
+    color: '#ccc',
+    fontSize: 13,
+    marginLeft: 8,
+  },
   forgotText: { color: '#a78bfa', fontSize: 13, fontWeight: '500' },
+
   loginButton: { borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
   loginButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   registerLink: { marginTop: 20, alignItems: 'center' },
   registerText: { color: '#999', fontSize: 14 },
   registerTextBold: { color: '#EC4899', fontWeight: 'bold' },
+
+  // ── Modal styles ──
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalBox: { backgroundColor: '#1a1a2e', borderRadius: 20, padding: 28, width: '100%', borderWidth: 1, borderColor: 'rgba(139,92,246,0.3)' },
   stepBar: { flexDirection: 'row', gap: 6, marginBottom: 24 },
@@ -416,8 +528,30 @@ const styles = StyleSheet.create({
   modalSubtitle: { fontSize: 13, color: '#999', marginBottom: 20, lineHeight: 20 },
   modalEmail: { fontSize: 14, fontWeight: '600', color: '#a78bfa', marginBottom: 20, marginTop: -14 },
   modalLabel: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 1, marginBottom: 8 },
+
+  // ── Modal email input wrap (Step 1) ──
+  modalInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    marginBottom: 16,
+    paddingHorizontal: 14,
+  },
+  modalInputWithIcon: {
+    flex: 1,
+    paddingVertical: 14,
+    color: '#fff',
+    fontSize: 15,
+  },
+
+  // kept for Step 2 code input
   modalInput: { backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14, color: '#fff', fontSize: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 16 },
   codeInput: { textAlign: 'center', fontSize: 22, letterSpacing: 8, fontWeight: 'bold' },
+
+  // ── Modal password wrap (Step 3) ──
   modalPasswordWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -426,18 +560,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     marginBottom: 16,
+    paddingHorizontal: 14,
   },
   modalPasswordInput: {
     flex: 1,
-    padding: 14,
+    paddingVertical: 14,
     color: '#fff',
     fontSize: 15,
   },
-  modalEyeBtn: {
-    paddingHorizontal: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+
   strengthWrap: {
     marginTop: -8,
     marginBottom: 12,

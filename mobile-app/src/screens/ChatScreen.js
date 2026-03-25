@@ -9,7 +9,6 @@ import {
   Platform,
   ActivityIndicator,
   Keyboard,
-  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,6 +27,22 @@ const ChatScreen = ({ route, navigation }) => {
   const [sending, setSending] = useState(false);
   const flatListRef = useRef();
   const insets = useSafeAreaInsets();
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  
+  // Get anonymous flag from route params
+  const isAnonymous = route?.params?.isAnonymous || false;
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   useEffect(() => {
     if (!feedbackId) {
@@ -85,8 +100,27 @@ const ChatScreen = ({ route, navigation }) => {
     }
   };
 
+  const getSenderDisplayName = (sender, senderRole) => {
+    // If feedback is anonymous and sender is student, show "Anonymous Student"
+    if (isAnonymous && senderRole === 'student') {
+      return 'Anonymous Student';
+    }
+    // If sender is staff, show "Staff"
+    if (senderRole === 'staff') {
+      return 'Staff';
+    }
+    // If sender is admin, show "Admin"
+    if (senderRole === 'admin') {
+      return 'Admin';
+    }
+    // For students, show their name
+    return sender?.name || 'Unknown';
+  };
+
   const renderMessage = ({ item }) => {
     const isMyMessage = item.sender._id === user.id;
+    const senderDisplayName = getSenderDisplayName(item.sender, item.senderRole);
+    
     return (
       <View style={[
         styles.messageContainer,
@@ -98,7 +132,7 @@ const ChatScreen = ({ route, navigation }) => {
         ]}>
           {!isMyMessage && (
             <Text style={styles.senderName}>
-              {item.sender.name} {item.senderRole === 'admin' ? '👨‍💼' : ''}
+              {senderDisplayName} {item.senderRole === 'admin' ? '👨‍💼' : (item.senderRole === 'staff' ? '👨‍🏫' : '')}
             </Text>
           )}
           <Text style={[
@@ -147,10 +181,7 @@ const ChatScreen = ({ route, navigation }) => {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={[styles.container, { paddingBottom: keyboardHeight }]}>
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -164,7 +195,7 @@ const ChatScreen = ({ route, navigation }) => {
 
       {/* Input bar */}
       <View style={[styles.inputContainer, {
-        paddingBottom: insets.bottom > 0 ? insets.bottom : 12,
+        paddingBottom: keyboardHeight > 0 ? 46 : (insets.bottom > 0 ? insets.bottom : 12),
       }]}>
         <TextInput
           style={styles.input}
@@ -201,7 +232,7 @@ const ChatScreen = ({ route, navigation }) => {
         </View>
       </LinearGradient>
 
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 

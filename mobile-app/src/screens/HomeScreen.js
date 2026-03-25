@@ -19,6 +19,7 @@ import ToastNotification from '../components/ToastNotification';
 
 const READ_NOTIFICATIONS_KEY = 'readNotifications';
 const LAST_READ_MSG_KEY = 'studentLastReadMsgId';
+const BANNER_VISIBLE_DURATION = 10000; // 10 seconds
 
 const HomeScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -27,12 +28,14 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [announcements, setAnnouncements] = useState([]);
   const [announcementIndex, setAnnouncementIndex] = useState(0);
+  const [showBanner, setShowBanner] = useState(false);
   const [toast, setToast] = useState(null);
-  const lastSeenStatus  = useRef({});
-  const lastSeenMsg     = useRef({});
-  const toastQueue      = useRef([]);
-  const isShowingToast  = useRef(false);
-  const initialized     = useRef(false);
+  const bannerTimeoutRef = useRef(null);
+  const lastSeenStatus = useRef({});
+  const lastSeenMsg = useRef({});
+  const toastQueue = useRef([]);
+  const isShowingToast = useRef(false);
+  const initialized = useRef(false);
 
   useEffect(() => {
     fetchFeedbackCount();
@@ -62,8 +65,27 @@ const HomeScreen = ({ navigation }) => {
   const fetchAnnouncements = async () => {
     try {
       const res = await announcementAPI.getActive();
-      setAnnouncements(res.data.announcements || []);
+      const newAnnouncements = res.data.announcements || [];
+      const hadAnnouncements = announcements.length > 0;
+      const hasNewAnnouncements = newAnnouncements.length > 0;
+      
+      setAnnouncements(newAnnouncements);
       setAnnouncementIndex(0);
+      
+      // Show banner if there are announcements
+      if (hasNewAnnouncements) {
+        setShowBanner(true);
+        
+        // Clear existing timeout
+        if (bannerTimeoutRef.current) {
+          clearTimeout(bannerTimeoutRef.current);
+        }
+        
+        // Set timeout to hide banner after 10 seconds
+        bannerTimeoutRef.current = setTimeout(() => {
+          setShowBanner(false);
+        }, BANNER_VISIBLE_DURATION);
+      }
     } catch {}
   };
 
@@ -185,6 +207,15 @@ const HomeScreen = ({ navigation }) => {
 
   const currentAnnouncement = announcements[announcementIndex];
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (bannerTimeoutRef.current) {
+        clearTimeout(bannerTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -220,9 +251,13 @@ const HomeScreen = ({ navigation }) => {
             />
           }
         >
-          {/* Banner */}
-          {currentAnnouncement ? (
-            <View style={styles.announcementBanner}>
+          {/* Banner - Shows rotating announcements for 10 seconds, then shows button */}
+          {showBanner && announcements.length > 0 ? (
+            <TouchableOpacity 
+              style={styles.announcementBanner}
+              onPress={() => navigation.navigate('Announcements')}
+              activeOpacity={0.9}
+            >
               <View style={styles.announcementIconWrap}>
                 <Text style={styles.announcementIcon}>📣</Text>
               </View>
@@ -241,7 +276,7 @@ const HomeScreen = ({ navigation }) => {
                   ))}
                 </View>
               )}
-            </View>
+            </TouchableOpacity>
           ) : (
             <TouchableOpacity
               style={styles.headerBanner}
@@ -249,6 +284,7 @@ const HomeScreen = ({ navigation }) => {
             >
               <Text style={styles.bannerIcon}>📣</Text>
               <Text style={styles.bannerText}>Announcements</Text>
+              <Text style={styles.bannerArrow}>→</Text>
             </TouchableOpacity>
           )}
 
@@ -472,15 +508,6 @@ const styles = StyleSheet.create({
   bannerIcon: { fontSize: 18 },
   bannerText: { fontSize: 13, color: '#4C1D95', flex: 1, lineHeight: 18, fontWeight: '600' },
   bannerArrow: { fontSize: 14, color: '#4C1D95', fontWeight: 'bold' },
-  announcementsLink: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#fff', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 14,
-    marginBottom: 16, borderWidth: 1, borderColor: '#e9d5ff',
-    shadowColor: '#6D28D9', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 4, elevation: 1,
-  },
-  announcementsLinkText: { fontSize: 13, fontWeight: '600', color: '#6D28D9' },
-  announcementsLinkArrow: { fontSize: 14, color: '#6D28D9', fontWeight: 'bold' },
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statCard: {
     flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 13, borderLeftWidth: 4,
@@ -489,8 +516,6 @@ const styles = StyleSheet.create({
   },
   statValue: { fontSize: 21, fontWeight: 'bold', color: '#1a1a2e', marginBottom: 3 },
   statKey: { fontSize: 12, color: '#888', lineHeight: 14 },
-
-  // ── Card styles ──
   createCard: {
     borderRadius: 16, padding: 14, marginBottom: 20, overflow: 'hidden',
     shadowColor: '#6D28D9', shadowOffset: { width: 0, height: 6 },
@@ -529,7 +554,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center',
   },
   plusIcon: { fontSize: 13, color: '#6D28D9', fontWeight: 'bold' },
-
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#1a1a2e', marginBottom: 12 },
   seeAll: { fontSize: 13, color: '#BE185D', fontWeight: '600' },
@@ -552,7 +576,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
   feedbackCountLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  feedbackBigNum: { fontSize: 36, fontWeight: 'bold', color: '#6D28D9' },
   feedbackBigIcon: { fontSize: 36 },
   feedbackCountLabel: { fontSize: 14, fontWeight: '600', color: '#1a1a2e' },
   feedbackSubLabel: { fontSize: 12, color: '#999', marginTop: 2 },
