@@ -6,6 +6,10 @@ const feedbackSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  isAnonymous: {
+    type: Boolean,
+    default: false
+  },
   category: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',

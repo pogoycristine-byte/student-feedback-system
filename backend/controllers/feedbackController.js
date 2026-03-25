@@ -3,7 +3,7 @@ const Feedback = require('../models/Feedback');
 // @desc    Submit new feedback with media
 exports.submitFeedback = async (req, res) => {
   try {
-    const { category, subject, teacherName, description, priority, location, dateTime } = req.body;
+    const { category, subject, teacherName, description, priority, location, dateTime, isAnonymous } = req.body;
 
     if (!category || !subject || !description) {
       return res.status(400).json({
@@ -14,6 +14,7 @@ exports.submitFeedback = async (req, res) => {
 
     const feedbackData = {
       student: req.user.id,
+      isAnonymous: isAnonymous || false,
       category,
       subject,
       teacherName: teacherName || '',
@@ -113,9 +114,23 @@ exports.getFeedbackById = async (req, res) => {
       });
     }
 
+    const feedbackObj = feedback.toObject();
+    
+    // Mask student data for staff when feedback is anonymous
+    if (feedbackObj.isAnonymous && req.user.role !== 'admin' && req.user.role !== 'student') {
+      feedbackObj.student = {
+        name: 'Anonymous Student',
+        studentId: null,
+        email: null,
+        phoneNumber: null,
+        yearLevel: null,
+        section: null
+      };
+    }
+
     res.status(200).json({
       success: true,
-      feedback
+      feedback: feedbackObj
     });
   } catch (error) {
     res.status(500).json({
@@ -166,10 +181,29 @@ exports.getAllFeedback = async (req, res) => {
       .populate('lastUpdatedBy', 'name role')
       .sort({ createdAt: -1 });
 
+    // Mask student data for staff when feedback is anonymous
+    const processedFeedback = feedback.map(item => {
+      const itemObj = item.toObject();
+      
+      // If feedback is anonymous and current user is NOT admin
+      if (itemObj.isAnonymous && req.user.role !== 'admin') {
+        // Mask student data for staff users
+        itemObj.student = {
+          name: 'Anonymous Student',
+          studentId: null,
+          email: null,
+          yearLevel: null,
+          section: null
+        };
+      }
+      
+      return itemObj;
+    });
+
     res.status(200).json({
       success: true,
-      count: feedback.length,
-      feedback
+      count: processedFeedback.length,
+      feedback: processedFeedback
     });
   } catch (error) {
     res.status(500).json({
@@ -378,19 +412,30 @@ exports.getMessages = async (req, res) => {
       });
     }
 
+    const feedbackObj = feedback.toObject();
+    
+    // Mask student data for staff when feedback is anonymous
+    if (feedbackObj.isAnonymous && req.user.role === 'staff') {
+      feedbackObj.student = {
+        _id: feedbackObj.student._id,
+        name: 'Anonymous Student',
+        studentId: null
+      };
+    }
+
     res.status(200).json({
       success: true,
       feedback: {
-        _id: feedback._id,
-        subject: feedback.subject,
-        status: feedback.status,
-        student: feedback.student,
-        location: feedback.location,
-        dateTime: feedback.dateTime,
-        createdAt: feedback.createdAt,
-        lastUpdatedBy: feedback.lastUpdatedBy
+        _id: feedbackObj._id,
+        subject: feedbackObj.subject,
+        status: feedbackObj.status,
+        student: feedbackObj.student,
+        location: feedbackObj.location,
+        dateTime: feedbackObj.dateTime,
+        createdAt: feedbackObj.createdAt,
+        lastUpdatedBy: feedbackObj.lastUpdatedBy
       },
-      messages: feedback.messages
+      messages: feedbackObj.messages
     });
   } catch (error) {
     res.status(500).json({
