@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   Keyboard,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,22 +28,9 @@ const ChatScreen = ({ route, navigation }) => {
   const [sending, setSending] = useState(false);
   const flatListRef = useRef();
   const insets = useSafeAreaInsets();
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   
   // Get anonymous flag from route params
   const isAnonymous = route?.params?.isAnonymous || false;
-
-  useEffect(() => {
-    const showSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => setKeyboardHeight(e.endCoordinates.height)
-    );
-    const hideSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardHeight(0)
-    );
-    return () => { showSub.remove(); hideSub.remove(); };
-  }, []);
 
   useEffect(() => {
     if (!feedbackId) {
@@ -181,58 +169,63 @@ const ChatScreen = ({ route, navigation }) => {
   }
 
   return (
-    <View style={[styles.container, { paddingBottom: keyboardHeight }]}>
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item, index) => index.toString()}
-        contentContainerStyle={[styles.messagesList, { paddingTop: HEADER_HEIGHT }]}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
-        style={{ flex: 1 }}
-      />
-
-      {/* Input bar */}
-      <View style={[styles.inputContainer, {
-        paddingBottom: keyboardHeight > 0 ? 46 : (insets.bottom > 0 ? insets.bottom : 12),
-      }]}>
-        <TextInput
-          style={styles.input}
-          placeholder="Type a message..."
-          placeholderTextColor="#999"
-          value={newMessage}
-          onChangeText={setNewMessage}
-          multiline
-          maxLength={500}
-        />
-        <TouchableOpacity
-          onPress={handleSendMessage}
-          disabled={sending || !newMessage.trim()}
-          style={[styles.sendButton, (!newMessage.trim() || sending) && styles.sendButtonDisabled]}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <View style={styles.container}>
+        {/* Fixed header */}
+        <LinearGradient
+          colors={['#6D28D9', '#BE185D']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
         >
-          <LinearGradient colors={['#6D28D9', '#BE185D']} style={styles.sendButtonGradient}>
-            <Text style={styles.sendButtonText}>{sending ? '...' : '📤'}</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Text style={styles.backArrow}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>{feedback?.subject}</Text>
+          </View>
+        </LinearGradient>
 
-      {/* Fixed header */}
-      <LinearGradient
-        colors={['#6D28D9', '#BE185D']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
-      >
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Text style={styles.backArrow}>‹</Text>
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item, index) => index.toString()}
+          contentContainerStyle={[styles.messagesList, { paddingTop: HEADER_HEIGHT, paddingBottom: 16 }]}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          style={{ flex: 1 }}
+        />
+
+        {/* Input bar */}
+        <View style={[styles.inputContainer, {
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 12,
+        }]}>
+          <TextInput
+            style={styles.input}
+            placeholder="Type a message..."
+            placeholderTextColor="#999"
+            value={newMessage}
+            onChangeText={setNewMessage}
+            multiline
+            maxLength={500}
+          />
+          <TouchableOpacity
+            onPress={handleSendMessage}
+            disabled={sending || !newMessage.trim()}
+            style={[styles.sendButton, (!newMessage.trim() || sending) && styles.sendButtonDisabled]}
+          >
+            <LinearGradient colors={['#6D28D9', '#BE185D']} style={styles.sendButtonGradient}>
+              <Text style={styles.sendButtonText}>{sending ? '...' : '📤'}</Text>
+            </LinearGradient>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{feedback?.subject}</Text>
         </View>
-      </LinearGradient>
-
-    </View>
+      </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -272,6 +265,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingTop: 12,
     paddingHorizontal: 12,
+    paddingBottom: 12,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',

@@ -68,3 +68,14 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 ### `npm run build` fails to minify
 
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+
+## 🐳 Running with Docker
+
+1. Install Docker Desktop
+2. Copy `backend/.env.example` to `backend/.env` and fill in credentials
+3. From the root folder run:
+```bash
+   docker-compose up --build
+```
+4. Admin dashboard → http://localhost:5173
+5. API → http://localhost:5000

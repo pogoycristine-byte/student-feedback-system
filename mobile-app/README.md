@@ -5,16 +5,14 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 ## Get started
 
 1. Install dependencies
-
-   ```bash
+```bash
    npm install
-   ```
+```
 
 2. Start the app
-
-   ```bash
+```bash
    npx expo start
-   ```
+```
 
 In the output, you'll find options to open the app in a
 
@@ -28,7 +26,6 @@ You can start developing by editing the files inside the **app** directory. This
 ## Get a fresh project
 
 When you're ready, run:
-
 ```bash
 npm run reset-project
 ```
@@ -48,3 +45,7 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## 🔗 Backend
+
+This app connects to the deployed backend on Render. No additional setup needed.

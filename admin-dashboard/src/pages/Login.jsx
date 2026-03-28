@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { AlertCircle, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { authAPI } from '../services/api';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -20,6 +21,18 @@ const Login = () => {
   const [forgotError, setForgotError] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // ── Password strength helpers ──
+  const validatePassword = (pw) => ({
+    hasUpper:   /[A-Z]/.test(pw),
+    hasLower:   /[a-z]/.test(pw),
+    hasNumber:  /\d/.test(pw),
+    hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(pw),
+    isLong:     pw.length >= 8,
+  });
+  const pwStrength = validatePassword(newPassword);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -104,14 +117,28 @@ const Login = () => {
     if (!forgotEmail) { setForgotError('Please enter your email.'); return; }
     setForgotError('');
     setForgotLoading(true);
-    setTimeout(() => { setForgotLoading(false); setForgotStep(2); }, 1200);
+    try {
+      await authAPI.forgotPassword(forgotEmail.toLowerCase().trim());
+      setForgotStep(2);
+    } catch (err) {
+      setForgotError(err.response?.data?.message || 'Failed to send reset code.');
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
   const handleForgotVerifyCode = async () => {
     if (!forgotCode) { setForgotError('Please enter the code.'); return; }
     setForgotError('');
     setForgotLoading(true);
-    setTimeout(() => { setForgotLoading(false); setForgotStep(3); }, 1000);
+    try {
+      await authAPI.verifyResetCode(forgotEmail.toLowerCase().trim(), forgotCode.trim());
+      setForgotStep(3);
+    } catch (err) {
+      setForgotError(err.response?.data?.message || 'Invalid or expired code.');
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
   const handleForgotResetPassword = async () => {
@@ -120,15 +147,14 @@ const Login = () => {
     if (newPassword.length < 6) { setForgotError('Password must be at least 6 characters.'); return; }
     setForgotError('');
     setForgotLoading(true);
-    setTimeout(() => {
+    try {
+      await authAPI.resetPassword(forgotEmail.toLowerCase().trim(), forgotCode.trim(), newPassword);
+      closeForgotModal();
+    } catch (err) {
+      setForgotError(err.response?.data?.message || 'Failed to reset password.');
+    } finally {
       setForgotLoading(false);
-      setShowForgotModal(false);
-      setForgotStep(1);
-      setForgotEmail('');
-      setForgotCode('');
-      setNewPassword('');
-      setConfirmPassword('');
-    }, 1000);
+    }
   };
 
   const closeForgotModal = () => {
@@ -139,6 +165,8 @@ const Login = () => {
     setForgotError('');
     setNewPassword('');
     setConfirmPassword('');
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
   };
 
   return (
@@ -208,7 +236,7 @@ const Login = () => {
         }
         .inp-eye {
           position: absolute; right: 13px;
-          color: rgba(0,0,0,0.6);
+          color: rgba(255,255,255,0.4);
           cursor: pointer;
           display: flex; align-items: center;
           transition: color 0.2s;
@@ -260,6 +288,21 @@ const Login = () => {
         }
         .inp-light::placeholder { color:rgba(255,255,255,0.25) }
 
+        .inp-light-icon {
+          width:100%; padding:13px 42px 13px 40px;
+          background:rgba(255,255,255,0.05);
+          border:1px solid rgba(255,255,255,0.12);
+          border-radius:10px; color:#fff;
+          font-size:14px; font-family:'DM Sans',sans-serif;
+          outline:none; transition:all 0.25s;
+        }
+        .inp-light-icon:focus {
+          background:rgba(109,40,217,0.15);
+          border-color:rgba(167,139,250,0.6);
+          box-shadow:0 0 0 3px rgba(109,40,217,0.15);
+        }
+        .inp-light-icon::placeholder { color:rgba(255,255,255,0.25) }
+
         .btn {
           width:100%; padding:14px;
           background:linear-gradient(135deg,#6D28D9,#9333ea 50%,#BE185D);
@@ -307,6 +350,7 @@ const Login = () => {
               ))}
             </div>
 
+            {/* ── Step 1: Enter Email ── */}
             {forgotStep === 1 && (
               <>
                 <div style={{ fontSize:28, marginBottom:8 }}>🔐</div>
@@ -320,10 +364,14 @@ const Login = () => {
                   </div>
                 )}
                 <label style={{ display:'block', fontSize:11, fontWeight:600, color:'rgba(255,255,255,0.38)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:7 }}>Email Address</label>
-                <input className="inp-light" type="email" placeholder="Enter your email" value={forgotEmail}
-                  onChange={e => setForgotEmail(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleForgotSendCode()}
-                  style={{ marginBottom:20 }} />
+                <div className="inp-wrap" style={{ marginBottom:20 }}>
+                  <span style={{ position:'absolute', left:13, color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', pointerEvents:'none' }}>
+                    <Mail size={16} />
+                  </span>
+                  <input className="inp-light-icon" type="email" placeholder="Enter your email" value={forgotEmail}
+                    onChange={e => setForgotEmail(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleForgotSendCode()} />
+                </div>
                 <button className="btn" onClick={handleForgotSendCode} disabled={forgotLoading}>
                   {forgotLoading ? (
                     <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
@@ -335,6 +383,7 @@ const Login = () => {
               </>
             )}
 
+            {/* ── Step 2: Enter Code ── */}
             {forgotStep === 2 && (
               <>
                 <div style={{ fontSize:28, marginBottom:8 }}>📬</div>
@@ -366,6 +415,7 @@ const Login = () => {
               </>
             )}
 
+            {/* ── Step 3: Set New Password ── */}
             {forgotStep === 3 && (
               <>
                 <div style={{ fontSize:28, marginBottom:8 }}>🔑</div>
@@ -376,12 +426,68 @@ const Login = () => {
                     <AlertCircle size={14} /> {forgotError}
                   </div>
                 )}
+
+                {/* New Password with lock icon + eye toggle */}
                 <label style={{ display:'block', fontSize:11, fontWeight:600, color:'rgba(255,255,255,0.38)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:7 }}>New Password</label>
-                <input className="inp-light" type="password" placeholder="Enter new password" value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)} style={{ marginBottom:14 }} />
+                <div className="inp-wrap" style={{ marginBottom: newPassword.length > 0 ? 10 : 14 }}>
+                  <span style={{ position:'absolute', left:13, color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', pointerEvents:'none' }}>
+                    <Lock size={16} />
+                  </span>
+                  <input
+                    className="inp-light-icon"
+                    type={showNewPassword ? 'text' : 'password'}
+                    placeholder="Enter new password"
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                  />
+                  <span className="inp-eye" onClick={() => setShowNewPassword(p => !p)}>
+                    {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </span>
+                </div>
+
+                {/* Password strength indicator */}
+                {newPassword.length > 0 && (
+                  <div style={{ marginBottom:14, padding:'10px 12px', background:'rgba(255,255,255,0.04)', borderRadius:10, border:'1px solid rgba(255,255,255,0.07)' }}>
+                    <p style={{ color:'rgba(255,255,255,0.5)', fontSize:11, marginBottom:6 }}>Password strength:</p>
+                    <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+                      {[pwStrength.isLong, pwStrength.hasUpper, pwStrength.hasLower, pwStrength.hasNumber, pwStrength.hasSpecial].map((met, i) => (
+                        <div key={i} style={{ flex:1, height:4, borderRadius:2, backgroundColor: met ? '#22c55e' : 'rgba(255,255,255,0.1)', transition:'background 0.3s' }} />
+                      ))}
+                    </div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:'6px 10px' }}>
+                      {[
+                        { label:'8+ chars',  met: pwStrength.isLong },
+                        { label:'Uppercase', met: pwStrength.hasUpper },
+                        { label:'Lowercase', met: pwStrength.hasLower },
+                        { label:'Number',    met: pwStrength.hasNumber },
+                        { label:'Symbol',    met: pwStrength.hasSpecial },
+                      ].map((h, i) => (
+                        <span key={i} style={{ fontSize:11, color: h.met ? '#22c55e' : 'rgba(255,255,255,0.3)', transition:'color 0.3s' }}>
+                          {h.met ? '✓' : '✗'} {h.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Confirm Password with lock icon + eye toggle */}
                 <label style={{ display:'block', fontSize:11, fontWeight:600, color:'rgba(255,255,255,0.38)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:7 }}>Confirm Password</label>
-                <input className="inp-light" type="password" placeholder="Confirm new password" value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)} style={{ marginBottom:20 }} />
+                <div className="inp-wrap" style={{ marginBottom:20 }}>
+                  <span style={{ position:'absolute', left:13, color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', pointerEvents:'none' }}>
+                    <Lock size={16} />
+                  </span>
+                  <input
+                    className="inp-light-icon"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Confirm new password"
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                  />
+                  <span className="inp-eye" onClick={() => setShowConfirmPassword(p => !p)}>
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </span>
+                </div>
+
                 <button className="btn" onClick={handleForgotResetPassword} disabled={forgotLoading}>
                   {forgotLoading ? (
                     <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>

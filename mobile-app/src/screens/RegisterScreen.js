@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,7 @@ const Field = React.memo(({
   formData,
   errors,
   handleChange,
+  onFocus,
 }) => (
   <View style={styles.fieldWrap}>
     <TextInput
@@ -36,6 +37,7 @@ const Field = React.memo(({
       keyboardType={keyboardType || 'default'}
       secureTextEntry={secureTextEntry || false}
       autoCapitalize={autoCapitalize || 'sentences'}
+      onFocus={onFocus}
     />
     {errors[field] && <Text style={styles.errorText}>⚠ {errors[field]}</Text>}
   </View>
@@ -57,6 +59,8 @@ const RegisterScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [contentHeight, setContentHeight] = useState(0);
+  const [scrollViewHeight, setScrollViewHeight] = useState(0);
 
   const { register } = useAuth();
   const scrollRef = useRef(null);
@@ -124,7 +128,7 @@ const RegisterScreen = ({ navigation }) => {
   };
 
   const handleRegister = async () => {
-    Keyboard.dismiss(); // Dismiss keyboard first
+    Keyboard.dismiss();
     if (!validate()) return;
 
     setLoading(true);
@@ -152,6 +156,31 @@ const RegisterScreen = ({ navigation }) => {
 
   const pwStrength = validatePassword(formData.password);
 
+  const scrollToField = (yPosition) => {
+    if (scrollRef.current && yPosition) {
+      scrollRef.current.scrollTo({
+        y: yPosition - 100,
+        animated: true,
+        duration: 300,
+      });
+    }
+  };
+
+  const handleFieldFocus = (event, fieldName) => {
+    // Get the position of the focused field
+    const { nativeEvent } = event;
+    const yPosition = nativeEvent?.target?.measureLayout?.(scrollRef.current, (x, y) => {
+      scrollToField(y);
+    });
+    
+    // Fallback for simpler scrolling
+    setTimeout(() => {
+      if (fieldName === 'password' || fieldName === 'confirmPassword') {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }
+    }, 100);
+  };
+
   return (
     <LinearGradient
       colors={['#1a1a2e', '#16213e', '#0f3460']}
@@ -168,6 +197,8 @@ const RegisterScreen = ({ navigation }) => {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
+          onContentSizeChange={(w, h) => setContentHeight(h)}
+          onLayout={(event) => setScrollViewHeight(event.nativeEvent.layout.height)}
         >
           <View style={styles.header}>
             <Text style={styles.title}>Create Account</Text>
@@ -209,6 +240,11 @@ const RegisterScreen = ({ navigation }) => {
                   onChangeText={(text) => handleChange('password', text)}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
+                  onFocus={() => {
+                    setTimeout(() => {
+                      scrollRef.current?.scrollToEnd({ animated: true });
+                    }, 100);
+                  }}
                 />
 
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
@@ -260,6 +296,11 @@ const RegisterScreen = ({ navigation }) => {
                   onChangeText={(text) => handleChange('confirmPassword', text)}
                   secureTextEntry={!showConfirmPassword}
                   autoCapitalize="none"
+                  onFocus={() => {
+                    setTimeout(() => {
+                      scrollRef.current?.scrollToEnd({ animated: true });
+                    }, 100);
+                  }}
                 />
 
                 <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeBtn}>
@@ -274,7 +315,7 @@ const RegisterScreen = ({ navigation }) => {
               {errors.confirmPassword && <Text style={styles.errorText}>⚠ {errors.confirmPassword}</Text>}
             </View>
 
-            {/* Fixed Button - No glitching */}
+            {/* Register Button */}
             <TouchableOpacity 
               onPress={handleRegister} 
               disabled={loading}
@@ -310,11 +351,11 @@ const styles = StyleSheet.create({
   scrollView: {
     flexGrow: 1,
     padding: 20,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 20,
   },
 
-  header: { marginBottom: 20 },
+  header: { marginBottom: 10 },
 
   title: {
     fontSize: 28,
