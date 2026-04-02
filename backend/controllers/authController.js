@@ -1,18 +1,26 @@
 const User = require('../models/User');
 const { generateToken } = require('../middleware/auth');
-
+const { cloudinary } = require('../middleware/upload');
 
 // ── Brevo email client (via fetch) ──
-
-
 
 // ── In-memory reset code store { email: { code, expiresAt } } ──
 const resetCodes = new Map();
 
+// ── Helper: upload a base64 or remote URI to Cloudinary ──────────────────────
+const uploadProfilePicToCloudinary = async (dataUri) => {
+  const result = await cloudinary.uploader.upload(dataUri, {
+    folder: 'student-feedback/profile-pictures',
+    transformation: [{ width: 300, height: 300, crop: 'fill', gravity: 'face', quality: 'auto' }],
+    public_id: `profile-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  });
+  return result.secure_url;
+};
+
 // @desc    Register new student
 exports.register = async (req, res) => {
   try {
-    const { name, studentId, email, phoneNumber, yearLevel, section, password } = req.body;
+    const { name, studentId, email, phoneNumber, yearLevel, section, password, profilePicture } = req.body;
 
     if (!name || !studentId || !email || !phoneNumber || !yearLevel || !section || !password) {
       return res.status(400).json({
@@ -44,6 +52,17 @@ exports.register = async (req, res) => {
       });
     }
 
+    // Upload profile picture to Cloudinary if provided
+    let profilePictureUrl = null;
+    if (profilePicture) {
+      try {
+        profilePictureUrl = await uploadProfilePicToCloudinary(profilePicture);
+      } catch (uploadErr) {
+        console.error('Profile picture upload failed:', uploadErr.message);
+        // Non-fatal — proceed without picture
+      }
+    }
+
     const user = await User.create({
       name,
       studentId,
@@ -52,6 +71,7 @@ exports.register = async (req, res) => {
       yearLevel,
       section,
       password,
+      profilePicture: profilePictureUrl,
       role: 'student'
     });
 
@@ -69,7 +89,8 @@ exports.register = async (req, res) => {
         phoneNumber: user.phoneNumber,
         yearLevel: user.yearLevel,
         section: user.section,
-        role: user.role
+        role: user.role,
+        profilePicture: user.profilePicture
       }
     });
   } catch (error) {
@@ -129,7 +150,8 @@ exports.login = async (req, res) => {
       name: user.name,
       studentId: user.studentId,
       email: user.email,
-      role: user.role
+      role: user.role,
+      profilePicture: user.profilePicture || null
     };
 
     if (user.role === 'student') {
@@ -174,13 +196,22 @@ exports.getProfile = async (req, res) => {
 // @desc    Update profile
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, phoneNumber, yearLevel, section } = req.body;
+    const { name, phoneNumber, yearLevel, section, profilePicture } = req.body;
 
     const updateFields = {};
     if (name) updateFields.name = name;
     if (phoneNumber) updateFields.phoneNumber = phoneNumber;
     if (yearLevel) updateFields.yearLevel = yearLevel;
     if (section) updateFields.section = section;
+
+    // Upload new profile picture if provided
+    if (profilePicture) {
+      try {
+        updateFields.profilePicture = await uploadProfilePicToCloudinary(profilePicture);
+      } catch (uploadErr) {
+        console.error('Profile picture upload failed:', uploadErr.message);
+      }
+    }
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
