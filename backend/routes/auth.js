@@ -2,11 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { protect, requireAdmin } = require('../middleware/auth');
 const authController = require('../controllers/authController');
-const { uploadProfile } = require('../middleware/upload'); // ← ADD
+const { uploadProfile } = require('../middleware/upload');
 const User = require('../models/User');
 
 // @route   POST /api/auth/register
-router.post('/register', uploadProfile.single('profilePicture'), authController.register); // ← UPDATED
+router.post('/register', uploadProfile.single('profilePicture'), authController.register);
 
 // @route   POST /api/auth/login
 router.post('/login', authController.login);
@@ -15,7 +15,8 @@ router.post('/login', authController.login);
 router.get('/me', protect, authController.getProfile);
 
 // @route   PUT /api/auth/update-profile
-router.put('/update-profile', protect, authController.updateProfile);
+// ✅ UPDATED: now accepts multipart/form-data for photo uploads
+router.put('/update-profile', protect, uploadProfile.single('profilePicture'), authController.updateProfile);
 
 // @route   PUT /api/auth/change-password
 router.put('/change-password', protect, authController.changePassword);
