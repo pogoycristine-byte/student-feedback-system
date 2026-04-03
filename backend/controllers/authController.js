@@ -45,9 +45,9 @@ exports.register = async (req, res) => {
 
     // ── Profile picture: prefer multer file upload, fall back to base64/URL ──
     let profilePictureUrl = null;
-    if (req.file?.path) {
-      // Came in as multipart — Cloudinary URL already set by multer-storage-cloudinary
-      profilePictureUrl = req.file.path;
+    if (req.file) {
+      // ✅ FIX: multer-storage-cloudinary may store the URL in .path, .secure_url, or .url
+      profilePictureUrl = req.file.path || req.file.secure_url || req.file.url || null;
     } else if (profilePicture) {
       // Came in as JSON (base64 or remote URL e.g. cartoon avatar)
       try {

@@ -45,14 +45,15 @@ const upload = multer({
 });
 
 // ── Profile picture upload ──
+// ✅ FIX: use async params function so public_id generates correctly
 const profileStorage = new CloudinaryStorage({
   cloudinary,
-  params: {
+  params: async (req, file) => ({
     folder: 'student-feedback/profile-pictures',
     allowed_formats: ['jpg', 'jpeg', 'png'],
     transformation: [{ width: 300, height: 300, crop: 'fill', gravity: 'face', quality: 'auto' }],
-    public_id: () => `profile-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  },
+    public_id: `profile-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  }),
 });
 
 const uploadProfile = multer({
