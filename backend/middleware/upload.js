@@ -41,7 +41,24 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max per file
+  limits: { fileSize: 50 * 1024 * 1024 },
 });
 
-module.exports = { upload, cloudinary };
+// ── Profile picture upload ──
+const profileStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'student-feedback/profile-pictures',
+    allowed_formats: ['jpg', 'jpeg', 'png'],
+    transformation: [{ width: 300, height: 300, crop: 'fill', gravity: 'face', quality: 'auto' }],
+    public_id: () => `profile-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  },
+});
+
+const uploadProfile = multer({
+  storage: profileStorage,
+  fileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+module.exports = { upload, uploadProfile, cloudinary };

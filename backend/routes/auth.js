@@ -2,10 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { protect, requireAdmin } = require('../middleware/auth');
 const authController = require('../controllers/authController');
+const { uploadProfile } = require('../middleware/upload'); // ← ADD
 const User = require('../models/User');
 
 // @route   POST /api/auth/register
-router.post('/register', authController.register);
+router.post('/register', uploadProfile.single('profilePicture'), authController.register); // ← UPDATED
 
 // @route   POST /api/auth/login
 router.post('/login', authController.login);

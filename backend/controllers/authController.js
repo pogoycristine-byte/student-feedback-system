@@ -31,30 +31,25 @@ exports.register = async (req, res) => {
 
     const existingStudentId = await User.findOne({ studentId });
     if (existingStudentId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Student ID already registered'
-      });
+      return res.status(400).json({ success: false, message: 'Student ID already registered' });
     }
 
     const existingEmail = await User.findOne({ email });
     if (existingEmail) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email already registered'
-      });
+      return res.status(400).json({ success: false, message: 'Email already registered' });
     }
 
     if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password must be at least 6 characters'
-      });
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
     }
 
-    // Upload profile picture to Cloudinary if provided
+    // ── Profile picture: prefer multer file upload, fall back to base64/URL ──
     let profilePictureUrl = null;
-    if (profilePicture) {
+    if (req.file?.path) {
+      // Came in as multipart — Cloudinary URL already set by multer-storage-cloudinary
+      profilePictureUrl = req.file.path;
+    } else if (profilePicture) {
+      // Came in as JSON (base64 or remote URL e.g. cartoon avatar)
       try {
         profilePictureUrl = await uploadProfilePicToCloudinary(profilePicture);
       } catch (uploadErr) {
@@ -204,7 +199,6 @@ exports.updateProfile = async (req, res) => {
     if (yearLevel) updateFields.yearLevel = yearLevel;
     if (section) updateFields.section = section;
 
-    // Upload new profile picture if provided
     if (profilePicture) {
       try {
         updateFields.profilePicture = await uploadProfilePicToCloudinary(profilePicture);
@@ -292,13 +286,11 @@ exports.forgotPassword = async (req, res) => {
       return res.status(404).json({ success: false, message: 'No account found with this email.' });
     }
 
-    // Generate 6-digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+    const expiresAt = Date.now() + 10 * 60 * 1000;
 
     resetCodes.set(email.toLowerCase(), { code, expiresAt });
 
-    // ── Send email via Brevo API ──
     await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
