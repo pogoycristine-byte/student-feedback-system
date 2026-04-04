@@ -24,6 +24,23 @@ exports.getAllAnnouncements = async (req, res) => {
   }
 };
 
+// GET /api/announcements/my — active announcements + own hidden ones (staff)
+exports.getMyAnnouncements = async (req, res) => {
+  try {
+    const announcements = await Announcement.find({
+      $or: [
+        { isActive: true },
+        { isActive: false, createdBy: req.user._id },
+      ],
+    })
+      .populate('createdBy', 'name role')
+      .sort({ createdAt: -1 });
+    res.json({ success: true, announcements });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
 // POST /api/announcements — create (admin or staff)
 exports.createAnnouncement = async (req, res) => {
   try {
