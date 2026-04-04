@@ -26,6 +26,18 @@ router.post('/forgot-password',    authController.forgotPassword);
 router.post('/verify-reset-code',  authController.verifyResetCode);
 router.post('/reset-password',     authController.resetPassword);
 
+// ── NEW: Heartbeat — updates lastSeen so admin panel shows live online status ──
+// @route   PUT /api/auth/heartbeat
+router.put('/heartbeat', protect, async (req, res) => {
+  try {
+    await User.findByIdAndUpdate(req.user._id, { lastSeen: new Date() });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Heartbeat error:', error);
+    res.status(500).json({ success: false, message: 'Heartbeat failed' });
+  }
+});
+
 // CREATE STAFF ACCOUNT (Admin only)
 router.post('/create-staff', protect, requireAdmin, async (req, res) => {
   try {
