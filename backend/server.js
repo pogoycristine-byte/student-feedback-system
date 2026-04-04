@@ -18,19 +18,21 @@ mongoose.connect(process.env.MONGODB_URI, {
 .then(() => console.log('✅ MongoDB Connected Successfully'))
 .catch((err) => console.error('❌ MongoDB Connection Error:', err));
 
-const authRoutes = require('./routes/auth');
-const feedbackRoutes = require('./routes/feedback');
-const categoryRoutes = require('./routes/category');
-const userRoutes = require('./routes/user');
-const analyticsRoutes = require('./routes/analytics');
-const announcementRoutes = require('./routes/announcements'); // ← NEW
+const authRoutes         = require('./routes/auth');
+const feedbackRoutes     = require('./routes/feedback');
+const categoryRoutes     = require('./routes/category');
+const userRoutes         = require('./routes/user');
+const analyticsRoutes    = require('./routes/analytics');
+const announcementRoutes = require('./routes/announcements');
+const messageRoutes      = require('./routes/messages'); // ✅ ADDED
 
-app.use('/api/auth', authRoutes);
-app.use('/api/feedback', feedbackRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/announcements', announcementRoutes); // ← NEW
+app.use('/api/auth',          authRoutes);
+app.use('/api/feedback',      feedbackRoutes);
+app.use('/api/categories',    categoryRoutes);
+app.use('/api/users',         userRoutes);
+app.use('/api/analytics',     analyticsRoutes);
+app.use('/api/announcements', announcementRoutes);
+app.use('/api/messages',      messageRoutes); // ✅ ADDED
 
 app.get('/', (req, res) => {
   res.json({ 
