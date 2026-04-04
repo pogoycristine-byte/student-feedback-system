@@ -9,6 +9,9 @@ router.get('/', protect, announcementController.getAnnouncements);
 // Admin only
 router.get('/all', protect, requireAdmin, announcementController.getAllAnnouncements);
 
+// Admin or Staff — own + active announcements (for staff panel)
+router.get('/my', protect, requireAdminOrStaff, announcementController.getMyAnnouncements);
+
 // Admin or Staff
 router.post('/', protect, requireAdminOrStaff, announcementController.createAnnouncement);
 router.put('/:id', protect, requireAdminOrStaff, announcementController.updateAnnouncement);
