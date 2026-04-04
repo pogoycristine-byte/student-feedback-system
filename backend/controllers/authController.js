@@ -199,7 +199,12 @@ exports.updateProfile = async (req, res) => {
     if (yearLevel) updateFields.yearLevel = yearLevel;
     if (section) updateFields.section = section;
 
-    if (profilePicture) {
+    // ✅ FIX: check req.file first (FormData photo upload via multer)
+    if (req.file) {
+      // multer-storage-cloudinary already uploaded it — just grab the URL
+      updateFields.profilePicture = req.file.path || req.file.secure_url || req.file.url;
+    } else if (profilePicture) {
+      // Cartoon avatar URL or base64 sent as JSON
       try {
         updateFields.profilePicture = await uploadProfilePicToCloudinary(profilePicture);
       } catch (uploadErr) {

@@ -39,6 +39,12 @@ const feedbackSchema = new mongoose.Schema({
     required: [true, 'Feedback description is required'],
     minlength: [10, 'Description must be at least 10 characters']
   },
+  // ✅ NEW: Store the "please specify" text when category is Others
+  otherSpecification: {
+    type: String,
+    trim: true,
+    default: null
+  },
   media: [
     {
       url: {
@@ -127,7 +133,6 @@ const feedbackSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  // ✅ NEW: Rating fields
   satisfactionRating: {
     type: Number,
     min: 1,
