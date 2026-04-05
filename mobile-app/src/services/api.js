@@ -39,6 +39,12 @@ export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
   getProfile: () => api.get('/auth/me'),
   updateProfile: (data) => api.put('/auth/update-profile', data),
+  // ✅ ADDED: multipart/form-data version for photo uploads
+  updateProfileForm: (formData) => api.put('/auth/update-profile', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  // ✅ ADDED: heartbeat to update lastSeen for online status
+  heartbeat: () => api.put('/auth/heartbeat'),
 };
 
 export const feedbackAPI = {

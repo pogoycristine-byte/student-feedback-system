@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { AppState } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { authAPI } from '../services/api';
 
@@ -11,6 +12,31 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     loadUser();
   }, []);
+
+  // ✅ ADDED: heartbeat — updates lastSeen every 30s so admin sees correct online status
+  useEffect(() => {
+    if (!user) return;
+
+    // Send immediately when user logs in or app loads
+    authAPI.heartbeat().catch(() => {});
+
+    // Then every 30 seconds
+    const interval = setInterval(() => {
+      authAPI.heartbeat().catch(() => {});
+    }, 30 * 1000);
+
+    // Also send when app comes back to foreground
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        authAPI.heartbeat().catch(() => {});
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [user]);
 
   const loadUser = async () => {
     try {
@@ -69,19 +95,34 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
-  // Update user both in state and SecureStore
+  // ✅ FIXED: use functional setUser to always get the latest user, avoiding stale closure
   const updateUser = async (updatedFields) => {
     try {
-      const updatedUser = { ...user, ...updatedFields };
-      await SecureStore.setItemAsync('user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
+      setUser(prevUser => {
+        const updatedUser = { ...prevUser, ...updatedFields };
+        // persist to SecureStore in the background
+        SecureStore.setItemAsync('user', JSON.stringify(updatedUser)).catch(err =>
+          console.error('Error persisting updated user:', err)
+        );
+        return updatedUser;
+      });
     } catch (error) {
       console.error('Error updating user:', error);
     }
   };
 
+  const setUserAndStore = async (userData) => {
+    try {
+      await SecureStore.setItemAsync('user', JSON.stringify(userData));
+      setUser(userData);
+    } catch (error) {
+      console.error('Error persisting user:', error);
+      setUser(userData);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, setUser, login, register, logout, loading, updateUser }}>
+    <AuthContext.Provider value={{ user, setUser: setUserAndStore, login, register, logout, loading, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -78,4 +78,12 @@ export const announcementAPI = {
   remove:  (id)       => api.delete(`/announcements/${id}`),
 };
 
+// ── Direct Messages API ──
+export const messagesAPI = {
+  getThreads:   ()                  => api.get('/messages/threads'),
+  getMessages:  (threadId)          => api.get(`/messages/${threadId}`),
+  send:         (threadId, message) => api.post(`/messages/${threadId}`, { message }),
+  getStaffList: ()                  => api.get('/messages/staff'),
+};
+
 export default api;

@@ -11,11 +11,3 @@ COPY . .
 EXPOSE 5173
 
 CMD ["npm", "run", "dev", "--", "--host"]
-```
-
----
-
-## `admin-dashboard/.dockerignore`
-```
-node_modules
-.env

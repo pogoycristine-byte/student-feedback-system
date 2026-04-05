@@ -14,6 +14,7 @@ import ReportsAnalytics from './pages/ReportsAnalytics';
 import StaffManageFeedback from './pages/StaffManageFeedback';
 import SchedulesPage from './pages/SchedulesPage';
 import Announcements from './pages/Announcements';
+import MessagesPage from './pages/MessagesPage';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -123,7 +124,6 @@ function App() {
               }
             />
 
-            {/* Staff only route */}
             <Route
               path="/staff/manage"
               element={
@@ -146,13 +146,24 @@ function App() {
               }
             />
 
-            {/* Announcements route */}
             <Route
               path="/announcements"
               element={
                 <PrivateRoute>
                   <AppLayout>
                     <Announcements />
+                  </AppLayout>
+                </PrivateRoute>
+              }
+            />
+
+            {/* Messages route — admin to staff direct messaging */}
+            <Route
+              path="/messages"
+              element={
+                <PrivateRoute>
+                  <AppLayout>
+                    <MessagesPage />
                   </AppLayout>
                 </PrivateRoute>
               }

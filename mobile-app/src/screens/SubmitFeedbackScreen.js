@@ -27,6 +27,7 @@ const SubmitFeedbackScreen = ({ navigation }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [otherSpecification, setOtherSpecification] = useState('');
 
   const [formData, setFormData] = useState({
     category: '',
@@ -63,8 +64,15 @@ const SubmitFeedbackScreen = ({ navigation }) => {
       const cats = response.data.categories;
 
       const sorted = [...cats].sort((a, b) => {
-        const aIsSuggestion = a.name?.toLowerCase().trim() === 'suggestions';
-        const bIsSuggestion = b.name?.toLowerCase().trim() === 'suggestions';
+        const aName = a.name?.toLowerCase().trim();
+        const bName = b.name?.toLowerCase().trim();
+        const aIsSuggestion = aName === 'suggestions';
+        const bIsSuggestion = bName === 'suggestions';
+        const aIsOther = aName === 'others' || aName === 'other';
+        const bIsOther = bName === 'others' || bName === 'other';
+
+        if (aIsOther) return 1;
+        if (bIsOther) return -1;
         if (aIsSuggestion && !bIsSuggestion) return -1;
         if (!aIsSuggestion && bIsSuggestion) return 1;
         return 0;
@@ -79,6 +87,12 @@ const SubmitFeedbackScreen = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const isOthersSelected = () => {
+    const selected = categories.find((c) => c._id === formData.category);
+    const name = selected?.name?.toLowerCase().trim();
+    return name === 'others' || name === 'other';
   };
 
   const takePhoto = async () => {
@@ -147,12 +161,19 @@ const SubmitFeedbackScreen = ({ navigation }) => {
       Alert.alert('Error', 'Please enter the date and time of class');
       return;
     }
+    if (isOthersSelected() && !otherSpecification.trim()) {
+      Alert.alert('Error', 'Please specify your category');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const submissionData = {
         ...formData,
         isAnonymous: isAnonymous,
         submittedAt: getCurrentDateTime(),
+        // When Others is selected, send "Others - their text" so feedback management displays it properly
+        ...(isOthersSelected() && { otherSpecification: otherSpecification.trim() }),
       };
 
       if (mediaFiles.length > 0) {
@@ -179,6 +200,7 @@ const SubmitFeedbackScreen = ({ navigation }) => {
             });
             setMediaFiles([]);
             setIsAnonymous(false);
+            setOtherSpecification('');
             navigation.goBack();
           },
         },
@@ -267,8 +289,8 @@ const SubmitFeedbackScreen = ({ navigation }) => {
               <View style={styles.anonymousTextContainer}>
                 <Text style={styles.anonymousTitle}>Submit Anonymously</Text>
                 <Text style={styles.anonymousSubtitle}>
-                  {isAnonymous 
-                    ? "Your identity will be hidden from staff" 
+                  {isAnonymous
+                    ? "Your identity will be hidden from staff"
                     : "Staff will see your name and details"}
                 </Text>
               </View>
@@ -290,11 +312,15 @@ const SubmitFeedbackScreen = ({ navigation }) => {
             )}
           </View>
 
+          {/* Category */}
           <Text style={styles.label}>Category (Required)</Text>
-          <View style={styles.pickerContainer}>
+          <View style={[styles.pickerContainer, isOthersSelected() && styles.pickerContainerWithSpecify]}>
             <Picker
               selectedValue={formData.category}
-              onValueChange={(value) => setFormData((prev) => ({ ...prev, category: value }))}
+              onValueChange={(value) => {
+                setFormData((prev) => ({ ...prev, category: value }));
+                setOtherSpecification('');
+              }}
               style={styles.picker}
               itemStyle={styles.pickerItem}
             >
@@ -302,6 +328,19 @@ const SubmitFeedbackScreen = ({ navigation }) => {
                 <Picker.Item key={cat._id} label={`${cat.icon} ${cat.name}`} value={cat._id} />
               ))}
             </Picker>
+
+            {/* Please specify — attached inside the same box */}
+            {isOthersSelected() && (
+              <View style={styles.specifyContainer}>
+                <TextInput
+                  style={styles.specifyInput}
+                  placeholder="Please specify..."
+                  placeholderTextColor="#999"
+                  value={otherSpecification}
+                  onChangeText={setOtherSpecification}
+                />
+              </View>
+            )}
           </View>
 
           <Text style={styles.label}>Location (Required)</Text>
@@ -318,7 +357,7 @@ const SubmitFeedbackScreen = ({ navigation }) => {
             </Picker>
           </View>
 
-          {/* Date & Time with Icons Inside Input - White background */}
+          {/* Date & Time */}
           <Text style={styles.label}>Date & Time of Class (Required)</Text>
           <View style={styles.inputWithIcons}>
             <TextInput
@@ -337,7 +376,6 @@ const SubmitFeedbackScreen = ({ navigation }) => {
           </View>
           <Text style={styles.helperText}>Select date and time when the class occurred</Text>
 
-          {/* Date Picker */}
           {showDatePicker && (
             <DateTimePicker
               value={selectedDate}
@@ -349,7 +387,6 @@ const SubmitFeedbackScreen = ({ navigation }) => {
             />
           )}
 
-          {/* Time Picker */}
           {showTimePicker && (
             <DateTimePicker
               value={selectedDate}
@@ -395,19 +432,13 @@ const SubmitFeedbackScreen = ({ navigation }) => {
             <View style={styles.mediaGrid}>
               {mediaFiles.map((file, index) => (
                 <View key={index} style={styles.mediaItem}>
-                  <Image
-                    source={{ uri: file.uri }}
-                    style={styles.mediaPreview}
-                  />
+                  <Image source={{ uri: file.uri }} style={styles.mediaPreview} />
                   {(file.type === 'video' || file.mimeType?.startsWith('video/')) && (
                     <View style={styles.videoOverlay}>
                       <Text style={styles.videoIcon}>🎥</Text>
                     </View>
                   )}
-                  <TouchableOpacity
-                    style={styles.removeButton}
-                    onPress={() => removeMedia(index)}
-                  >
+                  <TouchableOpacity style={styles.removeButton} onPress={() => removeMedia(index)}>
                     <Text style={styles.removeButtonText}>✕</Text>
                   </TouchableOpacity>
                 </View>
@@ -467,7 +498,7 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   content: { flex: 1, paddingHorizontal: 24, paddingTop: 16 },
   form: { width: '100%' },
-  
+
   // Anonymous Styles
   anonymousCard: {
     backgroundColor: '#f8f4ff',
@@ -482,22 +513,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  anonymousIcon: {
-    fontSize: 28,
-  },
-  anonymousTextContainer: {
-    flex: 1,
-  },
+  anonymousIcon: { fontSize: 28 },
+  anonymousTextContainer: { flex: 1 },
   anonymousTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: '#6D28D9',
     marginBottom: 2,
   },
-  anonymousSubtitle: {
-    fontSize: 12,
-    color: '#8B5CF6',
-  },
+  anonymousSubtitle: { fontSize: 12, color: '#8B5CF6' },
   anonymousInfo: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -507,18 +531,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#e9d5ff',
   },
-  anonymousInfoIcon: {
-    fontSize: 16,
-    marginTop: 2,
-  },
-  anonymousInfoText: {
-    flex: 1,
-    fontSize: 11,
-    color: '#6D28D9',
-    lineHeight: 16,
-  },
-  
-  // Input with Icons Inside - White background
+  anonymousInfoIcon: { fontSize: 16, marginTop: 2 },
+  anonymousInfoText: { flex: 1, fontSize: 11, color: '#6D28D9', lineHeight: 16 },
+
+  // Input with Icons Inside
   inputWithIcons: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -543,55 +559,64 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderLeftColor: '#e0e0e0',
   },
-  iconInsideText: {
-    fontSize: 18,
-  },
-  
+  iconInsideText: { fontSize: 18 },
+
   label: { fontSize: 13, color: '#1a1a2e', marginBottom: 6, fontWeight: '600' },
-  helperText: { 
-    fontSize: 11, 
-    color: '#666', 
-    marginTop: -8, 
-    marginBottom: 12, 
-    fontStyle: 'italic' 
+  helperText: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: -8,
+    marginBottom: 12,
+    fontStyle: 'italic',
   },
-  input: { 
-    backgroundColor: '#fff', 
-    borderRadius: 12, 
-    padding: 12, 
-    marginBottom: 12, 
-    color: '#1a1a2e', 
-    fontSize: 15, 
-    borderWidth: 1, 
-    borderColor: '#e0e0e0' 
+  input: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    color: '#1a1a2e',
+    fontSize: 15,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   textArea: { height: 100 },
-  pickerContainer: { 
-    backgroundColor: '#fff', 
-    borderRadius: 12, 
-    marginBottom: 12, 
-    borderWidth: 1, 
+
+  // Picker
+  pickerContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
     borderColor: '#e0e0e0',
-    overflow: 'hidden'
+    overflow: 'hidden',
   },
-  picker: { 
-    color: '#1a1a2e', 
-    height: 50 
+  pickerContainerWithSpecify: {
+    // keeps same look, specify field appended inside
   },
-  pickerItem: {
+  picker: { color: '#1a1a2e', height: 50 },
+  pickerItem: { fontSize: 15, color: '#1a1a2e' },
+
+  // Specify field — sits inside the picker box, divided by a top border
+  specifyContainer: {
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  specifyInput: {
+    padding: 12,
     fontSize: 15,
     color: '#1a1a2e',
-    borderRadius: 8,
+    backgroundColor: '#fafafa',
   },
-  uploadButton: { 
-    backgroundColor: '#f8f4ff', 
-    borderRadius: 12, 
-    padding: 18, 
-    alignItems: 'center', 
-    marginBottom: 12, 
-    borderWidth: 2, 
-    borderColor: '#e9d5ff', 
-    borderStyle: 'dashed' 
+
+  uploadButton: {
+    backgroundColor: '#f8f4ff',
+    borderRadius: 12,
+    padding: 18,
+    alignItems: 'center',
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#e9d5ff',
+    borderStyle: 'dashed',
   },
   uploadIcon: { fontSize: 32, marginBottom: 6 },
   uploadText: { fontSize: 13, color: '#6D28D9', fontWeight: '600' },

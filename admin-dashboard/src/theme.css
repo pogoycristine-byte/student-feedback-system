@@ -143,33 +143,37 @@ body {
 
 /* ===================================
    LIGHT MODE — SIDEBAR
+   Targets both old (.bg-white\/5) and new (inline style) sidebar markup
    =================================== */
 
-.light-mode .w-64.bg-white\/5 {
-  background: linear-gradient(180deg, #5b21b6 0%, #7c3aed 45%, #be185d 100%) !important;
-  border-right: 1px solid rgba(255,255,255,0.2);
+/* Old selector (kept for safety) */
+.light-mode .w-64.bg-white\/5,
+/* New selector — sidebar uses inline style background now */
+.light-mode .w-64 {
+  background: linear-gradient(180deg, #3b1a8f 0%, #5b21b6 45%, #86195e 100%) !important;
+  border-right: 1px solid rgba(255,255,255,0.2) !important;
   box-shadow: 4px 0 24px rgba(109,40,217,0.35);
   backdrop-filter: blur(20px);
 }
 
-.light-mode .w-64.bg-white\/5 *              { color: #ffffff !important; }
-.light-mode .w-64.bg-white\/5 h1             { color: #ffffff !important; text-shadow: 0 2px 8px rgba(0,0,0,0.3); }
-.light-mode .w-64.bg-white\/5 p              { color: #ffffff !important; }
-.light-mode .w-64.bg-white\/5 p.text-gray-400  { color: #ffffff !important; }
-.light-mode .w-64.bg-white\/5 span.text-violet-300 { color: #ffffff !important; }
-.light-mode .w-64.bg-white\/5 span.bg-violet-500\/30 {
+.light-mode .w-64 *              { color: #ffffff !important; }
+.light-mode .w-64 h1             { color: #ffffff !important; text-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+.light-mode .w-64 p              { color: #ffffff !important; }
+.light-mode .w-64 p.text-gray-400  { color: #ffffff !important; }
+.light-mode .w-64 span.text-violet-300 { color: #ffffff !important; }
+.light-mode .w-64 span.bg-violet-500\/30 {
   background: rgba(255,255,255,0.25) !important;
   color: #ffffff !important;
   border: 1px solid rgba(255,255,255,0.4) !important;
 }
-.light-mode .w-64.bg-white\/5 nav a          { color: #ffffff !important; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+.light-mode .w-64 nav a          { color: #ffffff !important; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
 
-.light-mode .w-64.bg-white\/5 nav a:hover {
+.light-mode .w-64 nav a:hover {
   background-color: rgba(255,255,255,0.18) !important;
   color: #ffffff !important;
 }
 
-.light-mode .w-64.bg-white\/5 nav a.bg-gradient-to-r {
+.light-mode .w-64 nav a.bg-gradient-to-r {
   background: rgba(255,255,255,0.28) !important;
   color: #ffffff !important;
   font-weight: 700;
@@ -177,8 +181,8 @@ body {
   border: 1px solid rgba(255,255,255,0.35);
 }
 
-.light-mode .w-64.bg-white\/5 button        { color: rgba(255,255,255,0.85) !important; }
-.light-mode .w-64.bg-white\/5 button:hover  { background-color: rgba(239,68,68,0.25) !important; color: #ffffff !important; }
+.light-mode .w-64 button        { color: rgba(255,255,255,0.85) !important; }
+.light-mode .w-64 button:hover  { background-color: rgba(239,68,68,0.25) !important; color: #ffffff !important; }
 
 /* ===================================
    LIGHT MODE — MAIN TEXT
@@ -545,10 +549,10 @@ select:focus {
 .light-mode .reports-chart-card tbody tr:hover {
   background: rgba(237,233,254,0.35) !important;
 }
-.light-mode .reports-chart-card tbody td       { color: #1e1b4b !important; }
-.light-mode .reports-chart-card tbody .text-white { color: #1e1b4b !important; }
-.light-mode .reports-chart-card tbody .text-gray-400 { color: #6b7280 !important; }
-.light-mode .reports-chart-card tbody .text-gray-500 { color: #6b7280 !important; }
+.light-mode .reports-chart-card tbody td span.text-white,
+.light-mode .reports-chart-card tbody td span { color: #1e1b4b !important; }
+.light-mode .reports-chart-card tbody td .text-white { color: #1e1b4b !important; }
+.light-mode .reports-chart-card tbody td .text-gray-400 { color: #6b7280 !important; }
 
 /* ── Progress bar track inside table ── */
 .light-mode .reports-chart-card .share-bar-track {
@@ -945,3 +949,92 @@ select:focus {
 /* ── Handled By column — light mode text fix ── */
 .light-mode .handled-by-name { color: #111827 !important; }
 .light-mode .handled-by-role { color: #6b7280 !important; }
+
+/* ===================================
+   LIGHT MODE — DARKER GRAY TEXT
+   Makes all gray detail text much darker/more readable
+   =================================== */
+
+.light-mode .text-gray-400 { color: #374151 !important; }
+.light-mode .text-gray-500 { color: #374151 !important; }
+.light-mode .text-gray-600 { color: #1f2937 !important; }
+
+.light-mode p.text-gray-400,
+.light-mode span.text-gray-400,
+.light-mode div.text-gray-400 { color: #374151 !important; }
+
+.light-mode p.text-gray-500,
+.light-mode span.text-gray-500,
+.light-mode div.text-gray-500 { color: #374151 !important; }
+
+.light-mode p.text-gray-600,
+.light-mode span.text-gray-600,
+.light-mode div.text-gray-600 { color: #1f2937 !important; }
+
+/* Inside cards */
+.light-mode .bg-white\/10 .text-gray-400,
+.light-mode .bg-white\/10 .text-gray-500 { color: #374151 !important; }
+
+/* Inside modals */
+.light-mode .bg-gray-800 .text-gray-400,
+.light-mode .bg-gray-800 .text-gray-500 { color: #374151 !important; }
+.light-mode .bg-gray-800 label          { color: #374151 !important; }
+
+/* Inside tables */
+.light-mode table tbody td .text-gray-400,
+.light-mode table tbody td .text-gray-500 { color: #374151 !important; }
+.light-mode table tbody .text-gray-400    { color: #374151 !important; }
+
+/* Inside feedback modal */
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] p.text-gray-400  { color: #374151 !important; }
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] span.text-gray-500 { color: #374151 !important; }
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .w-72 .text-gray-500 { color: #374151 !important; }
+.light-mode .fixed.inset-0 > div[style*="linear-gradient(145deg, #1a1025"] .w-72 .text-gray-600 { color: #1f2937 !important; }
+
+/* Inside reports page */
+.light-mode .reports-page .text-gray-400,
+.light-mode .reports-page .text-gray-500 { color: #374151 !important; }
+.light-mode .reports-chart-card .text-gray-400,
+.light-mode .reports-chart-card .text-gray-500 { color: #374151 !important; }
+
+/* Handled By role */
+.light-mode .handled-by-role { color: #374151 !important; }
+
+/* ===================================
+   LIGHT MODE — ACTIVE FILTER STATUS BUTTON
+   Fix: button becomes near-invisible on lavender background
+   when a status filter is selected. Each status uses its own color.
+   =================================== */
+
+.light-mode .status-dropdown-wrapper button.bg-violet-500\/20,
+.light-mode button.bg-violet-500\/20.border-violet-500\/40 {
+  background: #7c3aed !important;
+  border-color: #6d28d9 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 12px rgba(109,40,217,0.35) !important;
+}
+
+.light-mode .status-dropdown-wrapper button.bg-violet-500\/20 span,
+.light-mode .status-dropdown-wrapper button.bg-violet-500\/20 svg {
+  color: #ffffff !important;
+}
+
+/* ===================================
+   LIGHT MODE — ACTIVE FILTER CATEGORY BUTTON
+   Fix: button fades/becomes near-invisible on lavender background
+   when a category filter is selected (bg-pink-500/20 variant).
+   =================================== */
+
+.light-mode .category-dropdown-wrapper button.bg-pink-500\/20,
+.light-mode button.bg-pink-500\/20.border-pink-500\/40 {
+  background: #db2777 !important;
+  border-color: #be185d !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 12px rgba(219,39,119,0.35) !important;
+}
+
+.light-mode .category-dropdown-wrapper button.bg-pink-500\/20 span,
+.light-mode .category-dropdown-wrapper button.bg-pink-500\/20 svg,
+.light-mode .category-dropdown-wrapper button.bg-pink-500\/20 .text-pink-300 {
+  color: #ffffff !important;
+}

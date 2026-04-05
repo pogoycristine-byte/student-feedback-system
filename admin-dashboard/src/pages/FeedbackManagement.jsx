@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { feedbackAPI } from '../services/api';
+import { feedbackAPI, categoryAPI } from '../services/api';
 import { Search, Eye, Trash2, MessageSquare, Calendar, Filter, X, ChevronDown, Star, FileText } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -71,11 +71,23 @@ const resolveChangedBy = (changedBy) => {
   return { name: 'Unknown', role: 'admin' };
 };
 
+// Helper: returns the display label for a category, appending otherSpecification if present
+const getCategoryLabel = (item) => {
+  const baseName = item.category?.name || '';
+  const isOthers = baseName.toLowerCase().trim() === 'others' || baseName.toLowerCase().trim() === 'other';
+  if (isOthers && item.otherSpecification) {
+    return `${item.category?.icon || ''} ${baseName}: ${item.otherSpecification}`;
+  }
+  return `${item.category?.icon || ''} ${baseName}`;
+};
+
 const FeedbackManagement = () => {
   const [feedback, setFeedback] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [categories, setCategories] = useState([]);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [selectedFeedback, setSelectedFeedback] = useState(null);
@@ -83,9 +95,10 @@ const FeedbackManagement = () => {
   const [adminComment, setAdminComment] = useState('');
   const [newStatus, setNewStatus] = useState('');
   const [dismissedNew, setDismissedNew] = useState(getDismissed);
-  const [unreadChats, setUnreadChats] = useState(new Set());
+  const [unreadChats, setUnreadChats] = useState(new Map());
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [templates, setTemplates] = useState([]);
 
   const navigate = useNavigate();
@@ -100,7 +113,18 @@ const FeedbackManagement = () => {
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  // ── Auto-fill matching template when status changes ──
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await categoryAPI.getAll();
+        setCategories(response.data.categories || []);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      }
+    };
+    fetchCategories();
+  }, []);
+
   useEffect(() => {
     if (!newStatus) return;
     const match = templates.find(t => {
@@ -114,6 +138,7 @@ const FeedbackManagement = () => {
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (!e.target.closest('.status-dropdown-wrapper')) setShowStatusDropdown(false);
+      if (!e.target.closest('.category-dropdown-wrapper')) setShowCategoryDropdown(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -152,19 +177,30 @@ const FeedbackManagement = () => {
 
   const checkUnreadChats = async (allFeedback) => {
     const lastRead = getLastRead();
-    const unread = new Set();
+    const unreadMap = new Map();
     await Promise.all(
       allFeedback.map(async (item) => {
         try {
           const msgRes = await feedbackAPI.getMessages(item._id);
           const messages = msgRes.data.messages || [];
           if (messages.length === 0) return;
-          const lastMsg = messages[messages.length - 1];
-          if (lastMsg.senderRole === 'student' && lastRead[item._id] !== lastMsg._id) unread.add(item._id);
+          const lastReadId = lastRead[item._id];
+          let unreadCount = 0;
+          if (!lastReadId) {
+            unreadCount = messages.filter(m => m.senderRole === 'student').length;
+          } else {
+            const lastReadIndex = messages.findIndex(m => m._id === lastReadId);
+            if (lastReadIndex !== -1) {
+              unreadCount = messages
+                .slice(lastReadIndex + 1)
+                .filter(m => m.senderRole === 'student').length;
+            }
+          }
+          if (unreadCount > 0) unreadMap.set(item._id, unreadCount);
         } catch {}
       })
     );
-    setUnreadChats(unread);
+    setUnreadChats(unreadMap);
   };
 
   const handleViewDetails = async (item) => {
@@ -184,14 +220,12 @@ const FeedbackManagement = () => {
       const messages = msgRes.data.messages || [];
       if (messages.length > 0) markChatRead(item._id, messages[messages.length - 1]._id);
     } catch {}
-    setUnreadChats(prev => { const next = new Set(prev); next.delete(item._id); return next; });
-    
-    // Pass anonymous info to the chat page
-    navigate(`/feedback/${item._id}/chat`, { 
-      state: { 
+    setUnreadChats(prev => { const next = new Map(prev); next.delete(item._id); return next; });
+    navigate(`/feedback/${item._id}/chat`, {
+      state: {
         isAnonymous: item.isAnonymous,
-        studentName: item.student?.name 
-      } 
+        studentName: item.student?.name
+      }
     });
   };
 
@@ -240,12 +274,22 @@ const FeedbackManagement = () => {
     return () => observer.disconnect();
   }, []);
 
+  const dropdownPanelStyle = isLightMode
+    ? { background: 'rgba(255,255,255,0.97)', border: '1px solid rgba(196,181,253,0.5)', boxShadow: '0 8px 32px rgba(109,40,217,0.15)' }
+    : { background: '#1a1025', border: '1px solid rgba(255,255,255,0.1)' };
+
+  const dropdownItemActiveStyle = isLightMode ? 'bg-violet-100 text-violet-700' : 'bg-violet-500/20 text-violet-300';
+  const dropdownItemInactiveStyle = isLightMode ? 'text-gray-700 hover:bg-violet-50' : 'text-gray-400 hover:bg-white/10';
+  const dropdownBadgeActiveStyle = isLightMode ? 'bg-violet-200 text-violet-700' : 'bg-violet-500/30 text-violet-300';
+  const dropdownBadgeInactiveStyle = isLightMode ? 'bg-gray-100 text-gray-500' : 'bg-white/10 text-gray-500';
+  const categoryDropdownItemActiveStyle = isLightMode ? 'bg-pink-100 text-pink-700' : 'bg-pink-500/20 text-pink-300';
+  const categoryDropdownItemInactiveStyle = isLightMode ? 'text-gray-700 hover:bg-pink-50' : 'text-gray-400 hover:bg-white/10';
+  const categoryDropdownBadgeActiveStyle = isLightMode ? 'bg-pink-200 text-pink-700' : 'bg-pink-500/30 text-pink-300';
+
   const selectStyle = isLightMode
     ? { background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(196,181,253,0.4)', colorScheme: 'light', color: '#1e1b4b' }
     : { background: '#1a1025', border: '1px solid rgba(255,255,255,0.15)', colorScheme: 'dark', color: '#ffffff' };
-  const optionStyle = isLightMode
-    ? { background: '#ffffff', color: '#1e1b4b' }
-    : { background: '#1a1025' };
+  const optionStyle = isLightMode ? { background: '#ffffff', color: '#1e1b4b' } : { background: '#1a1025' };
 
   const getStatusBadge = (status) => {
     const s = STATUS_STYLES[status] || { pill: 'bg-gray-500/20 text-gray-300 border border-gray-500/40', dot: 'bg-gray-400' };
@@ -279,16 +323,21 @@ const FeedbackManagement = () => {
     }
   };
 
+  const selectedCategoryObj = categoryFilter !== 'All'
+    ? categories.find(c => c._id === categoryFilter)
+    : null;
+
   const filteredFeedback = feedback.filter((item) => {
     const matchesSearch =
       item.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.student?.name?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'All' || item.status === statusFilter;
+    const matchesCategory = categoryFilter === 'All' || item.category?._id === categoryFilter;
     const itemDate = new Date(item.createdAt);
     const from = dateFrom ? new Date(dateFrom) : null;
     const to = dateTo ? new Date(dateTo + 'T23:59:59') : null;
-    return matchesSearch && matchesStatus && (from ? itemDate >= from : true) && (to ? itemDate <= to : true);
+    return matchesSearch && matchesStatus && matchesCategory && (from ? itemDate >= from : true) && (to ? itemDate <= to : true);
   });
 
   if (loading) {
@@ -319,9 +368,9 @@ const FeedbackManagement = () => {
         </div>
       </div>
 
-      {/* ── Search + Status Dropdown + Date Filter Bar ── */}
-      <div className="flex gap-3 items-center">
-        <div className="flex-1 relative">
+      {/* ── Search + Filters ── */}
+      <div className="flex gap-3 items-center flex-wrap">
+        <div className="flex-1 relative min-w-[200px]">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 z-10" style={{ color: '#1e1b4b' }} />
           <input
             type="text"
@@ -338,6 +387,7 @@ const FeedbackManagement = () => {
           )}
         </div>
 
+        {/* ── Status Filter ── */}
         <div className="relative status-dropdown-wrapper">
           <button
             onClick={() => setShowStatusDropdown(!showStatusDropdown)}
@@ -355,18 +405,68 @@ const FeedbackManagement = () => {
             <ChevronDown className={`w-4 h-4 transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} />
           </button>
           {showStatusDropdown && (
-            <div className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-white/10 overflow-hidden z-50 shadow-2xl" style={{ background: '#1a1025' }}>
+            <div className="absolute right-0 top-full mt-2 w-52 rounded-xl overflow-hidden z-50 shadow-2xl" style={dropdownPanelStyle}>
               {STATUS_TABS.map(tab => {
                 const count = tab === 'All' ? feedback.length : feedback.filter(f => f.status === tab).length;
                 const isActive = statusFilter === tab;
                 return (
                   <button key={tab} onClick={() => { setStatusFilter(tab); setShowStatusDropdown(false); }}
-                    className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-all hover:bg-white/10 ${isActive ? 'bg-violet-500/20 text-violet-300' : 'text-gray-400'}`}>
+                    className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-all ${isActive ? dropdownItemActiveStyle : dropdownItemInactiveStyle}`}>
                     <div className="flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full ${statusDotColors[tab]}`} />
-                      <span className={isActive ? 'font-semibold text-violet-300' : ''}>{tab}</span>
+                      <span className={isActive ? 'font-semibold' : ''}>{tab}</span>
                     </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${isActive ? 'bg-violet-500/30 text-violet-300' : 'bg-white/10 text-gray-500'}`}>{count}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${isActive ? dropdownBadgeActiveStyle : dropdownBadgeInactiveStyle}`}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── Category Filter ── */}
+        <div className="relative category-dropdown-wrapper">
+          <button
+            onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-all ${
+              categoryFilter !== 'All' ? 'bg-pink-500/20 border-pink-500/40 text-pink-300' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            <span className="text-base leading-none">{selectedCategoryObj ? selectedCategoryObj.icon : '🗂️'}</span>
+            <span className="max-w-[120px] truncate">{categoryFilter === 'All' ? 'Filter Category' : selectedCategoryObj?.name || 'Category'}</span>
+            {categoryFilter !== 'All' && (
+              <span className="bg-pink-500/30 text-pink-300 text-xs px-1.5 py-0.5 rounded-full font-bold">
+                {feedback.filter(f => f.category?._id === categoryFilter).length}
+              </span>
+            )}
+            <ChevronDown className={`w-4 h-4 transition-transform shrink-0 ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+          </button>
+          {showCategoryDropdown && (
+            <div className="absolute right-0 top-full mt-2 w-60 rounded-xl overflow-hidden z-50 shadow-2xl"
+              style={{ ...dropdownPanelStyle, maxHeight: '320px', overflowY: 'auto' }}>
+              <button onClick={() => { setCategoryFilter('All'); setShowCategoryDropdown(false); }}
+                className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-all ${categoryFilter === 'All' ? categoryDropdownItemActiveStyle : categoryDropdownItemInactiveStyle}`}>
+                <div className="flex items-center gap-2">
+                  <span>🗂️</span>
+                  <span className={categoryFilter === 'All' ? 'font-semibold' : ''}>All Categories</span>
+                </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${categoryFilter === 'All' ? categoryDropdownBadgeActiveStyle : dropdownBadgeInactiveStyle}`}>
+                  {feedback.length}
+                </span>
+              </button>
+              {categories.map(cat => {
+                const count = feedback.filter(f => f.category?._id === cat._id).length;
+                const isActive = categoryFilter === cat._id;
+                return (
+                  <button key={cat._id} onClick={() => { setCategoryFilter(cat._id); setShowCategoryDropdown(false); }}
+                    className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-all ${isActive ? categoryDropdownItemActiveStyle : categoryDropdownItemInactiveStyle}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="shrink-0">{cat.icon}</span>
+                      <span className={`truncate ${isActive ? 'font-semibold' : ''}`}>{cat.name}</span>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold shrink-0 ml-2 ${isActive ? categoryDropdownBadgeActiveStyle : dropdownBadgeInactiveStyle}`}>
+                      {count}
+                    </span>
                   </button>
                 );
               })}
@@ -404,6 +504,9 @@ const FeedbackManagement = () => {
       <p className="text-gray-500 text-xs">
         Showing <span className="text-white font-semibold">{filteredFeedback.length}</span> of <span className="text-white font-semibold">{feedback.length}</span> feedback
         {statusFilter !== 'All' && <span className="ml-2 text-violet-400">· {statusFilter}</span>}
+        {categoryFilter !== 'All' && selectedCategoryObj && (
+          <span className="ml-2 text-pink-400">· {selectedCategoryObj.icon} {selectedCategoryObj.name}</span>
+        )}
         {(dateFrom || dateTo) && <span className="ml-2 text-violet-400">· {dateFrom || '…'} → {dateTo || '…'}</span>}
       </p>
 
@@ -415,7 +518,7 @@ const FeedbackManagement = () => {
               {['Student', 'Subject', 'Category', ...(isAdmin ? ['Handled By'] : []), 'Status', 'Date', 'Actions'].map(h => (
                 <th key={h} className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{h}</th>
               ))}
-             </tr>
+            </tr>
           </thead>
           <tbody>
             {filteredFeedback.length === 0 ? (
@@ -433,12 +536,14 @@ const FeedbackManagement = () => {
             ) : (
               filteredFeedback.map((item) => {
                 const showNew = isNewFeedback(item);
-                const hasUnread = unreadChats.has(item._id);
+                const unreadCount = unreadChats.get(item._id) || 0;
+                const hasUnread = unreadCount > 0;
                 const dueStatus = getDueStatus(item);
                 const dueBadge = dueStatus ? DUE_BADGE[dueStatus] : null;
+                const isOthers = item.category?.name?.toLowerCase().trim() === 'others' || item.category?.name?.toLowerCase().trim() === 'other';
                 return (
                   <tr key={item._id} className="group transition-all hover:bg-white/[0.04]" style={{ borderBottom: '1px solid rgba(0,0,0,0.25)' }}>
-                    {/* ── Student: masked for staff when isAnonymous, visible to admin ── */}
+                    {/* ── Student ── */}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         {showNew && (
@@ -473,12 +578,22 @@ const FeedbackManagement = () => {
                         {showNew && <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded-full font-black tracking-wide shrink-0">NEW</span>}
                       </div>
                     </td>
+
+                    {/* ── Category cell — shows "Others: specification" if applicable ── */}
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 text-sm text-gray-300 bg-white/5 border border-white/10 px-3 py-1 rounded-lg" style={{ width: '180px', minWidth: '180px' }}>
-                        <span className="shrink-0">{item.category?.icon}</span>
-                        <span className="truncate">{item.category?.name}</span>
-                      </span>
+                      <div className="inline-flex flex-col gap-0.5" style={{ width: '180px', minWidth: '180px' }}>
+                        <span className="inline-flex items-center gap-1.5 text-sm text-gray-300 bg-white/5 border border-white/10 px-3 py-1 rounded-lg">
+                          <span className="shrink-0">{item.category?.icon}</span>
+                          <span className="truncate">{item.category?.name}</span>
+                        </span>
+                        {isOthers && item.otherSpecification && (
+                          <span className="text-xs text-gray-400 px-3 italic truncate">
+                            "{item.otherSpecification}"
+                          </span>
+                        )}
+                      </div>
                     </td>
+
                     {isAdmin && (
                       <td className="px-6 py-4">
                         {item.lastUpdatedBy ? (
@@ -512,10 +627,17 @@ const FeedbackManagement = () => {
                           className="p-2 rounded-lg text-blue-400 hover:text-white hover:bg-blue-500 border border-blue-500/30 hover:border-blue-500 transition-all">
                           <Eye size={15} />
                         </button>
-                        <button onClick={() => handleChatClick(item)} title={hasUnread ? 'Student replied!' : 'Chat'}
+                        <button onClick={() => handleChatClick(item)} title={hasUnread ? `${unreadCount} unread message${unreadCount > 1 ? 's' : ''}` : 'Chat'}
                           className="relative p-2 rounded-lg text-violet-400 hover:text-white hover:bg-violet-500 border border-violet-500/30 hover:border-violet-500 transition-all">
                           <MessageSquare size={15} />
-                          {hasUnread && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-gray-900 animate-pulse" />}
+                          {hasUnread && (
+                            <span
+                              className="absolute -top-1.5 -right-1.5 bg-red-500 text-white font-bold rounded-full border-2 border-gray-900 animate-pulse flex items-center justify-center"
+                              style={{ fontSize: '9px', minWidth: '16px', height: '16px', padding: '0 3px' }}
+                            >
+                              {unreadCount > 99 ? '99+' : unreadCount}
+                            </span>
+                          )}
                         </button>
                         <button onClick={() => handleDelete(item._id)} title="Delete"
                           className="p-2 rounded-lg text-red-400 hover:text-white hover:bg-red-500 border border-red-500/30 hover:border-red-500 transition-all">
@@ -564,15 +686,24 @@ const FeedbackManagement = () => {
               <div className="flex-1 overflow-y-auto p-4 space-y-2 min-w-0">
                 <div className="grid grid-cols-2 gap-1.5">
                   {[
-                    // ── Student: masked for staff when isAnonymous, visible to admin ──
                     {
                       label: 'Student',
                       value: selectedFeedback.isAnonymous && !isAdmin ? 'Anonymous Student' : selectedFeedback.student?.name,
                       sub: selectedFeedback.isAnonymous && !isAdmin ? null : selectedFeedback.student?.studentId,
                       badge: selectedFeedback.isAnonymous ? (isAdmin ? '🕵️ Submitted Anonymously' : '🕵️ Anonymous') : null,
                     },
-                    { label: 'Subject',    value: selectedFeedback.subject },
-                    { label: 'Category',   value: `${selectedFeedback.category?.icon || ''} ${selectedFeedback.category?.name || ''}` },
+                    { label: 'Subject', value: selectedFeedback.subject },
+                    // ── Category field: shows specification below if Others ──
+                    {
+                      label: 'Category',
+                      value: `${selectedFeedback.category?.icon || ''} ${selectedFeedback.category?.name || ''}`,
+                      sub: (
+                        selectedFeedback.category?.name?.toLowerCase().trim() === 'others' ||
+                        selectedFeedback.category?.name?.toLowerCase().trim() === 'other'
+                      ) && selectedFeedback.otherSpecification
+                        ? `Specified: "${selectedFeedback.otherSpecification}"`
+                        : null,
+                    },
                     selectedFeedback.teacherName ? { label: 'Teacher', value: selectedFeedback.teacherName } : { label: 'Priority', value: selectedFeedback.priority },
                     selectedFeedback.location ? { label: 'Location', value: `📍 ${selectedFeedback.location}` } : null,
                     selectedFeedback.dateTime ? { label: 'Class Date & Time', value: `🕐 ${selectedFeedback.dateTime}` } : null,
@@ -585,13 +716,13 @@ const FeedbackManagement = () => {
                         <p className="text-sm font-medium leading-snug" style={{ color: isLightMode ? '#1e1b4b' : '#ffffff' }}>{field.value}</p>
                         {field.badge && <span className="text-[10px] bg-violet-500/30 text-violet-300 px-1.5 py-0.5 rounded-full">{field.badge}</span>}
                       </div>
-                      {field.sub && <p className="text-xs" style={{ color: '#6b7280' }}>{field.sub}</p>}
+                      {field.sub && <p className="text-xs mt-0.5 italic" style={{ color: isLightMode ? '#6b7280' : '#9ca3af' }}>{field.sub}</p>}
                     </div>
                   ))}
                 </div>
 
                 <div className="rounded-lg px-3 py-2" style={{ background: isLightMode ? 'rgba(109,40,217,0.06)' : 'rgba(255,255,255,0.04)', border: isLightMode ? '1.5px solid #c4b5fd' : '1px solid rgba(255,255,255,0.08)' }}>
-                  <p className="text-[9px] uppercase tracking-widest font-semibold mb-0.5" style={{ color: isLightMode ? '#4c1d95' : '#6b7280' }}>Description</p>
+                  <p className="text-[9px] uppercase tracking-widests font-semibold mb-0.5" style={{ color: isLightMode ? '#4c1d95' : '#6b7280' }}>Description</p>
                   <p className="text-sm leading-relaxed" style={{ color: isLightMode ? '#1e1b4b' : '#e5e7eb' }}>{selectedFeedback.description}</p>
                 </div>
 

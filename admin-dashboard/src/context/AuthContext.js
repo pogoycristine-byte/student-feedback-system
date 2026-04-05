@@ -1,11 +1,11 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { authAPI } from '../services/api';
 
 const AuthContext = createContext(null);
 
+const API_URL = 'https://student-feedback-backend-1xw4.onrender.com/api';
+
 export const AuthProvider = ({ children }) => {
-  // Initialize user synchronously from localStorage so PrivateRoute
-  // never sees null right after login + navigate
   const [user, setUser] = useState(() => {
     try {
       const savedUser = localStorage.getItem('user');
@@ -15,6 +15,44 @@ export const AuthProvider = ({ children }) => {
     }
   });
   const [loading, setLoading] = useState(false);
+
+  const heartbeatRef = useRef(null);
+
+  useEffect(() => {
+    if (!user) {
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
+      return;
+    }
+
+    const ping = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        await fetch(`${API_URL}/auth/heartbeat`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      } catch (e) {
+        // Silently ignore — heartbeat failures shouldn't disrupt the user
+      }
+    };
+
+    ping();
+    heartbeatRef.current = setInterval(ping, 5 * 1000); // ← Every 5 seconds
+
+    return () => {
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
+    };
+  }, [user]);
 
   const login = async (email, password) => {
     try {
@@ -37,6 +75,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.setItem('fromLogout', 'true'); // ← tells Login to skip landing page
     setUser(null);
   };
 

@@ -10,6 +10,7 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
@@ -19,18 +20,19 @@ import ToastNotification from '../components/ToastNotification';
 
 const READ_NOTIFICATIONS_KEY = 'readNotifications';
 const LAST_READ_MSG_KEY = 'studentLastReadMsgId';
+const SEEN_ANNOUNCEMENTS_KEY = 'seen_announcement_ids';
 
 const HomeScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [feedbackCount, setFeedbackCount] = useState(0);
-  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [announcements, setAnnouncements] = useState([]);
   const [announcementIndex, setAnnouncementIndex] = useState(0);
   const [toast, setToast] = useState(null);
-  // ── NEW: controls violet banner visibility ──
   const [showBanner, setShowBanner] = useState(false);
-  const bannerTimeoutRef = useRef(null); // ── NEW: ref to manage 10s timeout
+  const [seenAnnouncementIds, setSeenAnnouncementIds] = useState(new Set());
+  const bannerTimeoutRef = useRef(null);
   const lastSeenStatus  = useRef({});
   const lastSeenMsg     = useRef({});
   const toastQueue      = useRef([]);
@@ -42,7 +44,6 @@ const HomeScreen = ({ navigation }) => {
     initLastSeen();
     fetchAnnouncements();
 
-    // ── NEW: cleanup timeout on unmount ──
     return () => {
       if (bannerTimeoutRef.current) clearTimeout(bannerTimeoutRef.current);
     };
@@ -59,6 +60,7 @@ const HomeScreen = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       checkUnreadNotifications();
+      fetchAnnouncements();
     }, [])
   );
 
@@ -74,13 +76,19 @@ const HomeScreen = ({ navigation }) => {
       setAnnouncements(fetched);
       setAnnouncementIndex(0);
 
-      // ── NEW: show banner if there are announcements, hide after 10 seconds ──
-      if (fetched.length > 0) {
+      const raw = await AsyncStorage.getItem(SEEN_ANNOUNCEMENTS_KEY);
+      const ids = new Set(raw ? JSON.parse(raw) : []);
+      setSeenAnnouncementIds(ids);
+
+      const hasUnseen = fetched.some(a => !ids.has(a._id));
+      if (hasUnseen) {
         setShowBanner(true);
         if (bannerTimeoutRef.current) clearTimeout(bannerTimeoutRef.current);
         bannerTimeoutRef.current = setTimeout(() => {
           setShowBanner(false);
         }, 10000);
+      } else {
+        setShowBanner(false);
       }
     } catch {}
   };
@@ -161,6 +169,7 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  // ✅ UPDATED: now counts unread instead of just true/false
   const checkUnreadNotifications = async () => {
     try {
       const response = await feedbackAPI.getMyFeedback();
@@ -169,22 +178,25 @@ const HomeScreen = ({ navigation }) => {
       const readItems = new Set(saved ? JSON.parse(saved) : []);
       const savedMsgMap = await AsyncStorage.getItem(LAST_READ_MSG_KEY);
       const lastReadMsgMap = savedMsgMap ? JSON.parse(savedMsgMap) : {};
-      const hasUnreadStatus = allFeedback
+
+      const unreadStatusItems = allFeedback
         .filter((item) => item.status !== 'Pending')
-        .some((item) => !readItems.has(`status-${item._id}`));
-      let hasUnreadMessages = false;
+        .filter((item) => !readItems.has(`status-${item._id}`));
+
+      let unreadMessageCount = 0;
       for (const item of allFeedback.filter((i) => i.adminResponse?.comment)) {
         try {
           const msgRes = await feedbackAPI.getMessages(item._id);
           const messages = msgRes.data.messages || [];
           const lastAdminMsg = [...messages].reverse().find(m => m.senderRole === 'admin' || m.senderRole === 'staff');
           if (lastAdminMsg && lastReadMsgMap[item._id] !== lastAdminMsg._id) {
-            hasUnreadMessages = true;
-            break;
+            unreadMessageCount++;
           }
         } catch {}
       }
-      setHasUnreadNotifications(hasUnreadStatus || hasUnreadMessages);
+
+      const total = unreadStatusItems.length + unreadMessageCount;
+      setUnreadCount(total);
     } catch (error) {
       console.error('Error checking unread notifications:', error);
     }
@@ -197,11 +209,12 @@ const HomeScreen = ({ navigation }) => {
   }, []);
 
   const handleNotificationsPress = () => {
-    setHasUnreadNotifications(false);
+    setUnreadCount(0);
     navigation.navigate('Notifications');
   };
 
   const currentAnnouncement = announcements[announcementIndex];
+  const unreadAnnouncementCount = announcements.filter(a => !seenAnnouncementIds.has(a._id)).length;
 
   return (
     <KeyboardAvoidingView
@@ -221,8 +234,30 @@ const HomeScreen = ({ navigation }) => {
         >
           <View style={styles.decorCircle1} />
           <View style={styles.decorCircle2} />
-          <Text style={styles.welcomeText}>Welcome back,</Text>
-          <Text style={styles.userName}>{user?.name}</Text>
+
+          <View style={styles.headerRow}>
+            <View style={styles.headerTextWrap}>
+              <Text style={styles.welcomeText}>Welcome back,</Text>
+              <Text style={styles.userName}>{user?.name}</Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Profile')}
+              activeOpacity={0.85}
+              style={styles.avatarWrap}
+            >
+              {user?.profilePicture ? (
+                <Image source={{ uri: user.profilePicture }} style={styles.avatarImg} />
+              ) : (
+                <View style={styles.avatarFallback}>
+                  <Text style={styles.avatarInitial}>
+                    {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.onlineDot} />
+            </TouchableOpacity>
+          </View>
         </LinearGradient>
 
         <ScrollView
@@ -238,7 +273,7 @@ const HomeScreen = ({ navigation }) => {
             />
           }
         >
-          {/* Banner — violet if showBanner + announcements exist, else simple button */}
+          {/* Banner */}
           {showBanner && currentAnnouncement ? (
             <TouchableOpacity onPress={() => navigation.navigate('Announcements')}>
               <View style={styles.announcementBanner}>
@@ -253,6 +288,11 @@ const HomeScreen = ({ navigation }) => {
                     {currentAnnouncement.message}
                   </Text>
                 </View>
+                {unreadAnnouncementCount > 0 && (
+                  <View style={styles.announcementBadge}>
+                    <Text style={styles.announcementBadgeText}>{unreadAnnouncementCount}</Text>
+                  </View>
+                )}
                 {announcements.length > 1 && (
                   <View style={styles.announcementDots}>
                     {announcements.map((_, i) => (
@@ -269,6 +309,11 @@ const HomeScreen = ({ navigation }) => {
             >
               <Text style={styles.bannerIcon}>📣</Text>
               <Text style={styles.bannerText}>Announcements</Text>
+              {unreadAnnouncementCount > 0 && (
+                <View style={styles.announcementBadge}>
+                  <Text style={styles.announcementBadgeText}>{unreadAnnouncementCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           )}
 
@@ -432,7 +477,12 @@ const HomeScreen = ({ navigation }) => {
           <TouchableOpacity style={styles.navItem} onPress={handleNotificationsPress}>
             <View style={styles.navIconWrapper}>
               <Text style={styles.navIcon}>🔔</Text>
-              {hasUnreadNotifications && <View style={styles.redDot} />}
+              {/* ✅ CHANGED: red dot replaced with number badge */}
+              {unreadCount > 0 && (
+                <View style={styles.unreadBadge}>
+                  <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+                </View>
+              )}
             </View>
             <Text style={styles.navLabel}>Notifications</Text>
           </TouchableOpacity>
@@ -456,7 +506,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F4F4F8' },
   header: {
     paddingTop: (StatusBar.currentHeight || 44) + 10,
-    paddingBottom: 14, paddingHorizontal: 24, overflow: 'hidden',
+    paddingBottom: 14,
+    paddingHorizontal: 24,
+    overflow: 'hidden',
+    minHeight: (StatusBar.currentHeight || 44) + 10 + 14 + 42,
   },
   decorCircle1: {
     position: 'absolute', width: 200, height: 200, borderRadius: 100,
@@ -466,6 +519,30 @@ const styles = StyleSheet.create({
     position: 'absolute', width: 120, height: 120, borderRadius: 60,
     backgroundColor: 'rgba(255,255,255,0.05)', bottom: -20, right: 80,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  avatarWrap: { position: 'relative' },
+  avatarImg: {
+    width: 42, height: 42, borderRadius: 21,
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)',
+  },
+  avatarFallback: {
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  avatarInitial: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
+  onlineDot: {
+    position: 'absolute', bottom: 1, right: 1,
+    width: 10, height: 10, borderRadius: 5,
+    backgroundColor: '#22c55e', borderWidth: 1.5, borderColor: '#6D28D9',
+  },
+  headerTextWrap: { flex: 1 },
   welcomeText: { fontSize: 11, color: '#fff', opacity: 0.9, marginBottom: 2 },
   userName: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
@@ -485,22 +562,18 @@ const styles = StyleSheet.create({
   announcementDots: { flexDirection: 'column', gap: 4, alignItems: 'center' },
   dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(237,233,254,0.3)' },
   dotActive: { backgroundColor: '#EDE9FE', height: 10, borderRadius: 3 },
+  announcementBadge: {
+    backgroundColor: '#EF4444', borderRadius: 10,
+    minWidth: 20, height: 20, paddingHorizontal: 5,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  announcementBadgeText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
   headerBanner: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#EDE9FE',
     borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, marginBottom: 20, gap: 10,
   },
   bannerIcon: { fontSize: 18 },
   bannerText: { fontSize: 13, color: '#4C1D95', flex: 1, lineHeight: 18, fontWeight: '600' },
-  bannerArrow: { fontSize: 14, color: '#4C1D95', fontWeight: 'bold' },
-  announcementsLink: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#fff', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 14,
-    marginBottom: 16, borderWidth: 1, borderColor: '#e9d5ff',
-    shadowColor: '#6D28D9', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 4, elevation: 1,
-  },
-  announcementsLinkText: { fontSize: 13, fontWeight: '600', color: '#6D28D9' },
-  announcementsLinkArrow: { fontSize: 14, color: '#6D28D9', fontWeight: 'bold' },
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statCard: {
     flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 13, borderLeftWidth: 4,
@@ -569,7 +642,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
   feedbackCountLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  feedbackBigNum: { fontSize: 36, fontWeight: 'bold', color: '#6D28D9' },
   feedbackBigIcon: { fontSize: 36 },
   feedbackCountLabel: { fontSize: 14, fontWeight: '600', color: '#1a1a2e' },
   feedbackSubLabel: { fontSize: 12, color: '#999', marginTop: 2 },
@@ -613,29 +685,27 @@ const styles = StyleSheet.create({
   submitButtonText: { fontSize: 16, fontWeight: 'bold', color: '#fff', marginRight: 8 },
   submitButtonIcon: { fontSize: 18 },
   bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 12,
-    paddingBottom: 0,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 8,
+    flexDirection: 'row', justifyContent: 'space-around',
+    paddingVertical: 12, paddingBottom: 0, backgroundColor: '#fff',
+    borderTopWidth: 1, borderTopColor: '#e0e0e0',
+    shadowColor: '#000', shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08, shadowRadius: 4, elevation: 8,
   },
-  navItem: { alignItems: 'center', paddingVertical: 0, paddingBottom: 14},
+  navItem: { alignItems: 'center', paddingVertical: 0, paddingBottom: 14 },
   navIconActive: { fontSize: 24, marginBottom: 4 },
   navIcon: { fontSize: 24, opacity: 0.4 },
   navLabelActive: { fontSize: 11, color: '#BE185D', fontWeight: 'bold' },
   navLabel: { fontSize: 11, color: '#999' },
   navIconWrapper: { position: 'relative', marginBottom: 4 },
-  redDot: {
-    position: 'absolute', top: -2, right: -4, width: 10, height: 10,
-    borderRadius: 5, backgroundColor: '#EF4444', borderWidth: 1.5, borderColor: '#fff',
+  // ✅ CHANGED: replaced redDot with unreadBadge showing actual count
+  unreadBadge: {
+    position: 'absolute', top: -4, right: -6,
+    backgroundColor: '#EF4444', borderRadius: 10,
+    minWidth: 18, height: 18, paddingHorizontal: 4,
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1.5, borderColor: '#fff',
   },
+  unreadBadgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
 });
 
 export default HomeScreen;

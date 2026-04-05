@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
   menuSubtitle: { fontSize: 13, color: '#6B7280' },
   arrow: { fontSize: 24, color: '#D1D5DB' },
   logoutButtonWrapper: { marginBottom: 20 },
-  logoutButton: { backgroundColor: '#EF4444', borderRadius: 16, padding: 18, alignItems: 'center', justifyContent: 'center' },
+  logoutButton: { backgroundColor: '#ac2071', borderRadius: 16, padding: 18, alignItems: 'center', justifyContent: 'center' },
   logoutText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });
 

@@ -10,12 +10,16 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { announcementAPI } from '../services/api';
+
+const SEEN_ANNOUNCEMENTS_KEY = 'seen_announcement_ids';
 
 const AnnouncementsScreen = ({ navigation }) => {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [seenIds, setSeenIds] = useState(new Set());
 
   useEffect(() => {
     fetchAnnouncements();
@@ -24,7 +28,15 @@ const AnnouncementsScreen = ({ navigation }) => {
   const fetchAnnouncements = async () => {
     try {
       const res = await announcementAPI.getActive();
-      setAnnouncements(res.data.announcements || []);
+      const fetched = res.data.announcements || [];
+      setAnnouncements(fetched);
+
+      const raw = await AsyncStorage.getItem(SEEN_ANNOUNCEMENTS_KEY);
+      const existingIds = new Set(raw ? JSON.parse(raw) : []);
+      setSeenIds(new Set(existingIds));
+
+      fetched.forEach(a => existingIds.add(a._id));
+      await AsyncStorage.setItem(SEEN_ANNOUNCEMENTS_KEY, JSON.stringify([...existingIds]));
     } catch {}
     finally { setLoading(false); }
   };
@@ -45,7 +57,6 @@ const AnnouncementsScreen = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar translucent={true} backgroundColor="transparent" barStyle="light-content" />
 
-      {/* Header */}
       <LinearGradient
         colors={['#6D28D9', '#BE185D']}
         start={{ x: 0, y: 0 }}
@@ -56,9 +67,14 @@ const AnnouncementsScreen = ({ navigation }) => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Text style={styles.backArrow}>‹</Text>
           </TouchableOpacity>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>Announcements</Text>
-            <Text style={styles.headerSub}>{announcements.length} announcement{announcements.length !== 1 ? 's' : ''}</Text>
+            <Text style={styles.headerSub}>
+              {announcements.length} announcement{announcements.length !== 1 ? 's' : ''}
+              {announcements.filter(a => !seenIds.has(a._id)).length > 0
+                ? ` · ${announcements.filter(a => !seenIds.has(a._id)).length} new`
+                : ''}
+            </Text>
           </View>
         </View>
       </LinearGradient>
@@ -82,28 +98,37 @@ const AnnouncementsScreen = ({ navigation }) => {
         >
           {announcements.length === 0 ? (
             <View style={styles.emptyWrap}>
-              <Text style={styles.emptyIcon}>📭</Text>
               <Text style={styles.emptyTitle}>No announcements yet</Text>
               <Text style={styles.emptySub}>Check back later for updates from your school.</Text>
             </View>
           ) : (
-            announcements.map((item, index) => (
-              <View key={item._id} style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.iconWrap}>
-                    <Text style={styles.icon}>📣</Text>
+            announcements.map((item) => {
+              const isNew = !seenIds.has(item._id);
+              return (
+                <View key={item._id} style={[styles.card, isNew && styles.cardNew]}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.cardMeta}>
+                      <View style={styles.cardTitleRow}>
+                        <Text style={[styles.cardTitle, isNew && styles.cardTitleNew]} numberOfLines={1}>
+                          {item.title}
+                        </Text>
+                        {isNew && <View style={styles.redDot} />}
+                      </View>
+                      <Text style={styles.cardDate}>
+                        {formatDate(item.createdAt)}
+                        {item.createdBy?.name ? ` · ${item.createdBy.name}` : ''}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.cardMeta}>
-                    <Text style={styles.cardTitle}>{item.title}</Text>
-                    <Text style={styles.cardDate}>
-                      {formatDate(item.createdAt)}
-                      {item.createdBy?.name ? ` · ${item.createdBy.name}` : ''}
-                    </Text>
-                  </View>
+                  <Text style={styles.cardMessage}>{item.message}</Text>
+                  {isNew && (
+                    <View style={styles.newBadge}>
+                      <Text style={styles.newBadgeText}>NEW</Text>
+                    </View>
+                  )}
                 </View>
-                <Text style={styles.cardMessage}>{item.message}</Text>
-              </View>
-            ))
+              );
+            })
           )}
           <View style={{ height: 40 }} />
         </ScrollView>
@@ -136,9 +161,10 @@ const styles = StyleSheet.create({
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
   emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 10 },
-  emptyIcon: { fontSize: 48 },
   emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#1a1a2e' },
   emptySub: { fontSize: 13, color: '#999', textAlign: 'center', lineHeight: 20 },
+
+  // Card
   card: {
     backgroundColor: '#fff',
     borderRadius: 16,
@@ -152,20 +178,49 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 6 },
-  iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#EDE9FE',
-    justifyContent: 'center',
-    alignItems: 'center',
+  cardNew: {
+    borderColor: '#C4B5FD',
+    backgroundColor: '#FAFAFF',
+    shadowColor: '#6D28D9',
+    shadowOpacity: 0.08,
+    elevation: 3,
   },
-  icon: { fontSize: 16 },
+  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 },
   cardMeta: { flex: 1 },
-  cardTitle: { fontSize: 16, fontWeight: 'bold', color: '#1a1a2e', marginBottom: 2 },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  cardTitle: { fontSize: 16, fontWeight: '600', color: '#555', flex: 1 },
+  cardTitleNew: { fontWeight: 'bold', color: '#1a1a2e' },
   cardDate: { fontSize: 12, color: '#999' },
   cardMessage: { fontSize: 13, color: '#555', lineHeight: 20 },
+
+  // Red dot
+  redDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: '#EF4444',
+  },
+
+  // NEW badge
+  newBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    backgroundColor: '#EF4444',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  newBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
 });
 
 export default AnnouncementsScreen;

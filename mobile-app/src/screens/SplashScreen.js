@@ -142,15 +142,15 @@ const SplashScreen = ({ onFinish }) => {
 
     // Countdown
     const interval = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          setTimeout(() => { if (onFinish) onFinish(); }, 0);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+  setCountdown((prev) => {
+    if (prev <= 1) {
+      clearInterval(interval);
+      setTimeout(() => { if (onFinish) onFinish(); }, 0);
+      return 0;
+    }
+    return prev - 1;
+  });
+}, 1000);
 
     return () => clearInterval(interval);
   }, []);
@@ -161,14 +161,14 @@ const SplashScreen = ({ onFinish }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a0b2e" />
+      <StatusBar barStyle="light-content" backgroundColor="#080612" />
 
       {/* Moving background */}
       <Animated.View style={[StyleSheet.absoluteFill, {
         transform: [{ translateX: gradientX }, { translateY: gradientY }, { rotate: rotateInterpolation }],
       }]}>
         <LinearGradient
-          colors={['#1a0b2e','#310b8a','#9e0954','#28037e','#2d1b4e','#1a0b2e']}
+          colors={['#040309','#0a0330','#350318','#0a0140','#0a0818','#040309']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={{ width: width * 4, height: height * 4 }}
         />
@@ -179,8 +179,8 @@ const SplashScreen = ({ onFinish }) => {
         {/* TOP: ClassBack title */}
         <View style={styles.topSection}>
           <View style={styles.titleWrapper}>
-            <Text style={[styles.titleText, { color: '#ffffff' }]}>Class</Text>
-            <Text style={[styles.titleText, { color: '#f472b6' }]}>Back</Text>
+            <Text style={[styles.titleText, { color: '#c8c8c8' }]}>Class</Text>
+            <Text style={[styles.titleText, { color: '#8b1a4a' }]}>Back</Text>
           </View>
         </View>
 
@@ -219,40 +219,40 @@ const SplashScreen = ({ onFinish }) => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1, backgroundColor: '#1a0b2e',
+    flex: 1, backgroundColor: '#080612',
     alignItems: 'center', justifyContent: 'space-between',
     paddingTop: height * 0.07, paddingBottom: height * 0.10,
   },
   wrapper: {
     flex: 1, width: '100%',
     alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: height * 0.10, paddingBottom: height * 0.03,
+    paddingTop: height * 0.08, paddingBottom: height * 0.03,
     paddingHorizontal: 24,
   },
   topSection: { alignItems: 'center' },
   titleWrapper: { flexDirection: 'row', alignItems: 'center' },
   titleText: {
-    fontFamily: CURSIVE_FONT, fontSize: 54,
-    textShadowColor: 'rgba(0,0,0,0.5)',
+    fontFamily: CURSIVE_FONT, fontSize: 54,fontWeight: 'bold',
+    textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 10,
   },
-  middleSpace: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  middleSpace: { flex: 1, alignItems: 'center', justifyContent: 'center',marginTop: -40  },
   lottieWrapper: { alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  lottie: { width: 250, height: 250 },
+  lottie: { width: 150, height: 150 },
   iconLabel: {
-    fontSize: 13, color: 'rgba(255,255,255,0.6)',
+    fontSize: 13, color: 'rgba(255,255,255,0.35)',
     letterSpacing: 1.5, textTransform: 'uppercase',
   },
   bottomSection: { alignItems: 'center', gap: 8 },
   countdownText: {
-    fontSize: 11, color: 'rgba(255,255,255,0.4)',
+    fontSize: 11, color: 'rgba(255,255,255,0.25)',
     letterSpacing: 0.5,
   },
   dotsContainer: { flexDirection: 'row', gap: 12 },
   dot: {
-    width: 10, height: 10, borderRadius: 5, backgroundColor: '#ffffff',
-    shadowColor: '#ffffff', shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6, shadowRadius: 8, elevation: 8,
+    width: 10, height: 10, borderRadius: 5, backgroundColor: '#aaaaaa',
+    shadowColor: '#aaaaaa', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4, shadowRadius: 8, elevation: 8,
   },
 });
 
