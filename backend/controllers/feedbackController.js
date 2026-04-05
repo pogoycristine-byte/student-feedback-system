@@ -3,7 +3,7 @@ const Feedback = require('../models/Feedback');
 // @desc    Submit new feedback with media
 exports.submitFeedback = async (req, res) => {
   try {
-    const { category, subject, teacherName, description, priority, location, dateTime, isAnonymous } = req.body;
+    const { category, subject, teacherName, description, priority, location, dateTime, isAnonymous, otherSpecification } = req.body;
 
     if (!category || !subject || !description) {
       return res.status(400).json({
@@ -21,7 +21,8 @@ exports.submitFeedback = async (req, res) => {
       description,
       priority: priority || 'Medium',
       location: location || 'TMC Main Campus',
-      dateTime: dateTime || ''
+      dateTime: dateTime || '',
+      otherSpecification: otherSpecification || null,
     };
 
     if (req.files && req.files.length > 0) {
