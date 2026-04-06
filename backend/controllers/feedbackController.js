@@ -176,7 +176,7 @@ exports.getAllFeedback = async (req, res) => {
     }
 
     const feedback = await Feedback.find(query)
-      .populate('student', 'name studentId email yearLevel section')
+      .populate('student', 'name studentId email yearLevel section profilePicture') // ← added profilePicture
       .populate('category', 'name icon')
       .populate('adminResponse.respondedBy', 'name role')
       .populate('lastUpdatedBy', 'name role')
@@ -188,13 +188,14 @@ exports.getAllFeedback = async (req, res) => {
       
       // If feedback is anonymous and current user is NOT admin
       if (itemObj.isAnonymous && req.user.role !== 'admin') {
-        // Mask student data for staff users
+        // Mask student data for staff users — keep profilePicture null for anonymous
         itemObj.student = {
           name: 'Anonymous Student',
           studentId: null,
           email: null,
           yearLevel: null,
-          section: null
+          section: null,
+          profilePicture: null,
         };
       }
       
@@ -447,7 +448,6 @@ exports.getMessages = async (req, res) => {
   }
 };
 
-// ✅ NEW: Submit rating for resolved feedback
 // @desc    Submit rating for resolved feedback
 // @route   PUT /api/feedback/:id/rate
 // @access  Private (Students only)
@@ -455,7 +455,6 @@ exports.submitRating = async (req, res) => {
   try {
     const { satisfactionRating, satisfactionComment } = req.body;
     
-    // Find feedback
     const feedback = await Feedback.findById(req.params.id);
     
     if (!feedback) {
@@ -465,7 +464,6 @@ exports.submitRating = async (req, res) => {
       });
     }
     
-    // Check if user owns this feedback
     if (feedback.student.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
@@ -473,7 +471,6 @@ exports.submitRating = async (req, res) => {
       });
     }
     
-    // Check if feedback is resolved
     if (feedback.status !== 'Resolved') {
       return res.status(400).json({
         success: false,
@@ -481,7 +478,6 @@ exports.submitRating = async (req, res) => {
       });
     }
     
-    // Check if already rated
     if (feedback.satisfactionRating) {
       return res.status(400).json({
         success: false,
@@ -489,7 +485,6 @@ exports.submitRating = async (req, res) => {
       });
     }
     
-    // Validate rating
     if (!satisfactionRating || satisfactionRating < 1 || satisfactionRating > 5) {
       return res.status(400).json({
         success: false,
@@ -497,7 +492,6 @@ exports.submitRating = async (req, res) => {
       });
     }
     
-    // Save rating
     feedback.satisfactionRating = satisfactionRating;
     feedback.satisfactionComment = satisfactionComment || '';
     feedback.ratedAt = new Date();
