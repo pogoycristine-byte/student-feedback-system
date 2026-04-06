@@ -248,7 +248,7 @@ const MessagesPage = () => {
                         className="truncate"
                         style={{
                           fontSize: 13,
-                          color: '#000000',
+                          color: 'rgba(255, 255, 255, 0.75)',
                           fontWeight: item.unread ? 700 : 500,
                         }}
                       >
