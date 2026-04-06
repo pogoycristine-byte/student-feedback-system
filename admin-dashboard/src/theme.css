@@ -385,6 +385,61 @@ body {
 }
 
 /* ===================================
+   LIGHT MODE — bg-gray-900 MODAL
+   (SchedulesPage Edit Schedule modal)
+   =================================== */
+
+.light-mode .bg-gray-900 {
+  background: rgba(255,255,255,0.97) !important;
+  backdrop-filter: blur(32px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(200%) !important;
+  border: 1px solid rgba(196,181,253,0.5) !important;
+  box-shadow: 0 24px 64px rgba(109,40,217,0.15), inset 0 1px 0 rgba(255,255,255,0.95) !important;
+  color: #1e1b4b !important;
+}
+
+/* Modal heading & subtitle */
+.light-mode .bg-gray-900 h2             { color: #1e1b4b !important; }
+.light-mode .bg-gray-900 p              { color: #6b7280 !important; }
+
+/* Labels */
+.light-mode .bg-gray-900 label         { color: #4c1d95 !important; }
+
+/* Student card inside modal */
+.light-mode .bg-gray-900 .bg-white\/5  {
+  background: rgba(237,233,254,0.45) !important;
+  border: 1px solid rgba(196,181,253,0.35) !important;
+}
+.light-mode .bg-gray-900 .bg-white\/5 .text-white  { color: #1e1b4b !important; }
+.light-mode .bg-gray-900 .bg-white\/5 .text-gray-400 { color: #6b7280 !important; }
+
+/* Textarea & datetime input */
+.light-mode .bg-gray-900 textarea,
+.light-mode .bg-gray-900 input[type="datetime-local"] {
+  background: rgba(255,255,255,0.75) !important;
+  border: 1px solid rgba(196,181,253,0.4) !important;
+  color: #1e1b4b !important;
+  color-scheme: light;
+}
+.light-mode .bg-gray-900 textarea::placeholder { color: #9ca3af !important; }
+
+/* Cancel button */
+.light-mode .bg-gray-900 .bg-white\/10 {
+  background: rgba(237,233,254,0.55) !important;
+  border: 1px solid rgba(196,181,253,0.35) !important;
+  color: #4c1d95 !important;
+}
+.light-mode .bg-gray-900 .bg-white\/10:hover {
+  background: rgba(237,233,254,0.75) !important;
+  transform: none;
+}
+.light-mode .bg-gray-900 .bg-white\/10.text-white { color: #4c1d95 !important; }
+
+/* X close button */
+.light-mode .bg-gray-900 .text-gray-500 { color: #9ca3af !important; }
+.light-mode .bg-gray-900 button.text-gray-500:hover { color: #1e1b4b !important; }
+
+/* ===================================
    LIGHT MODE — CHARTS (global)
    =================================== */
 

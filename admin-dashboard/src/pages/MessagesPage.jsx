@@ -167,26 +167,14 @@ const MessagesPage = () => {
 
   return (
     <div className="flex flex-col h-full" style={{ padding: '20px' }}>
-      {/* Page title */}
-      <div style={{ marginBottom: 16 }}>
-        <h1
-          className="font-bold bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent"
-          style={{ fontSize: 20 }}
-        >
-          Messages
-        </h1>
-        <p className="text-gray-400" style={{ fontSize: 12, marginTop: 2 }}>
-          {isAdmin ? 'Direct message your staff members' : 'Your messages from admin'}
-        </p>
-      </div>
 
-      {/* Main panel — outer border added */}
+      {/* Main panel */}
       <div
         className="flex flex-1 rounded-xl overflow-hidden"
         style={{
           border: '1.5px solid rgba(0,0,0,0.15)',
           minHeight: 0,
-          height: 'calc(100vh - 130px)',
+          height: 'calc(100vh - 80px)',
           background: 'rgba(255,255,255,0.03)',
         }}
       >

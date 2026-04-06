@@ -60,6 +60,51 @@ const STATUS_STYLES = {
 
 const STATUS_TABS = ['All', 'Pending', 'Under Review', 'Resolved', 'Rejected'];
 
+const STATUS_DROPDOWN_COLORS = {
+  All: {
+    dot: '#9ca3af',
+    active: { bg: 'rgba(107,114,128,0.15)', color: '#9ca3af', border: '#6b7280', badge: 'rgba(107,114,128,0.25)' },
+    activeLight: { bg: 'rgba(107,114,128,0.1)', color: '#374151', border: '#6b7280', badge: 'rgba(107,114,128,0.15)' },
+  },
+  Pending: {
+    dot: '#fbbf24',
+    active: { bg: 'rgba(234,179,8,0.15)', color: '#fbbf24', border: '#d97706', badge: 'rgba(234,179,8,0.25)' },
+    activeLight: { bg: 'rgba(217,119,6,0.1)', color: '#92400e', border: '#d97706', badge: 'rgba(217,119,6,0.15)' },
+  },
+  'Under Review': {
+    dot: '#60a5fa',
+    active: { bg: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '#2563eb', badge: 'rgba(59,130,246,0.25)' },
+    activeLight: { bg: 'rgba(37,99,235,0.1)', color: '#1d4ed8', border: '#2563eb', badge: 'rgba(37,99,235,0.15)' },
+  },
+  Resolved: {
+    dot: '#34d399',
+    active: { bg: 'rgba(16,185,129,0.15)', color: '#34d399', border: '#059669', badge: 'rgba(16,185,129,0.25)' },
+    activeLight: { bg: 'rgba(5,150,105,0.1)', color: '#065f46', border: '#059669', badge: 'rgba(5,150,105,0.15)' },
+  },
+  Rejected: {
+    dot: '#f87171',
+    active: { bg: 'rgba(239,68,68,0.15)', color: '#f87171', border: '#dc2626', badge: 'rgba(239,68,68,0.25)' },
+    activeLight: { bg: 'rgba(220,38,38,0.1)', color: '#991b1b', border: '#dc2626', badge: 'rgba(220,38,38,0.15)' },
+  },
+};
+
+// ── SOLID light-mode colors for the active status trigger button ──
+const STATUS_BUTTON_COLORS_DARK = {
+  All:            { bg: 'rgba(107,114,128,0.2)', border: 'rgba(107,114,128,0.4)', color: '#9ca3af' },
+  Pending:        { bg: 'rgba(234,179,8,0.2)',   border: 'rgba(234,179,8,0.4)',   color: '#fbbf24' },
+  'Under Review': { bg: 'rgba(59,130,246,0.2)',  border: 'rgba(59,130,246,0.4)',  color: '#60a5fa' },
+  Resolved:       { bg: 'rgba(16,185,129,0.2)',  border: 'rgba(16,185,129,0.4)',  color: '#34d399' },
+  Rejected:       { bg: 'rgba(239,68,68,0.2)',   border: 'rgba(239,68,68,0.4)',   color: '#f87171' },
+};
+
+const STATUS_BUTTON_COLORS_LIGHT = {
+  All:            { bg: '#6b7280', border: '#4b5563', color: '#ffffff' },
+  Pending:        { bg: '#d97706', border: '#b45309', color: '#ffffff' },
+  'Under Review': { bg: '#2563eb', border: '#1d4ed8', color: '#ffffff' },
+  Resolved:       { bg: '#059669', border: '#047857', color: '#ffffff' },
+  Rejected:       { bg: '#dc2626', border: '#b91c1c', color: '#ffffff' },
+};
+
 const resolveChangedBy = (changedBy) => {
   if (!changedBy) return { name: 'Unknown', role: 'admin' };
   if (typeof changedBy === 'object') {
@@ -71,7 +116,6 @@ const resolveChangedBy = (changedBy) => {
   return { name: 'Unknown', role: 'admin' };
 };
 
-// Helper: returns the display label for a category, appending otherSpecification if present
 const getCategoryLabel = (item) => {
   const baseName = item.category?.name || '';
   const isOthers = baseName.toLowerCase().trim() === 'others' || baseName.toLowerCase().trim() === 'other';
@@ -85,7 +129,7 @@ const FeedbackManagement = () => {
   const [feedback, setFeedback] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [categories, setCategories] = useState([]);
   const [dateFrom, setDateFrom] = useState('');
@@ -163,7 +207,7 @@ const FeedbackManagement = () => {
 
   const fetchFeedback = async () => {
     try {
-      const params = statusFilter !== 'All' ? { status: statusFilter } : {};
+      const params = (statusFilter !== null && statusFilter !== 'All') ? { status: statusFilter } : {};
       const response = await feedbackAPI.getAll(params);
       const allFeedback = response.data.feedback || [];
       setFeedback(allFeedback);
@@ -278,9 +322,6 @@ const FeedbackManagement = () => {
     ? { background: 'rgba(255,255,255,0.97)', border: '1px solid rgba(196,181,253,0.5)', boxShadow: '0 8px 32px rgba(109,40,217,0.15)' }
     : { background: '#1a1025', border: '1px solid rgba(255,255,255,0.1)' };
 
-  const dropdownItemActiveStyle = isLightMode ? 'bg-violet-100 text-violet-700' : 'bg-violet-500/20 text-violet-300';
-  const dropdownItemInactiveStyle = isLightMode ? 'text-gray-700 hover:bg-violet-50' : 'text-gray-400 hover:bg-white/10';
-  const dropdownBadgeActiveStyle = isLightMode ? 'bg-violet-200 text-violet-700' : 'bg-violet-500/30 text-violet-300';
   const dropdownBadgeInactiveStyle = isLightMode ? 'bg-gray-100 text-gray-500' : 'bg-white/10 text-gray-500';
   const categoryDropdownItemActiveStyle = isLightMode ? 'bg-pink-100 text-pink-700' : 'bg-pink-500/20 text-pink-300';
   const categoryDropdownItemInactiveStyle = isLightMode ? 'text-gray-700 hover:bg-pink-50' : 'text-gray-400 hover:bg-white/10';
@@ -291,6 +332,9 @@ const FeedbackManagement = () => {
     : { background: '#1a1025', border: '1px solid rgba(255,255,255,0.15)', colorScheme: 'dark', color: '#ffffff' };
   const optionStyle = isLightMode ? { background: '#ffffff', color: '#1e1b4b' } : { background: '#1a1025' };
 
+  // ── Pick the right button color table based on mode ──
+  const STATUS_BUTTON_COLORS = isLightMode ? STATUS_BUTTON_COLORS_LIGHT : STATUS_BUTTON_COLORS_DARK;
+
   const getStatusBadge = (status) => {
     const s = STATUS_STYLES[status] || { pill: 'bg-gray-500/20 text-gray-300 border border-gray-500/40', dot: 'bg-gray-400' };
     return (
@@ -300,11 +344,6 @@ const FeedbackManagement = () => {
         {status}
       </span>
     );
-  };
-
-  const statusDotColors = {
-    All: 'bg-gray-400', Pending: 'bg-yellow-400', 'Under Review': 'bg-blue-400',
-    Resolved: 'bg-emerald-400', Rejected: 'bg-red-400',
   };
 
   const renderStars = (rating) => (
@@ -332,13 +371,18 @@ const FeedbackManagement = () => {
       item.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.student?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || item.status === statusFilter;
+    const matchesStatus = statusFilter === null || statusFilter === 'All' || item.status === statusFilter;
     const matchesCategory = categoryFilter === 'All' || item.category?._id === categoryFilter;
     const itemDate = new Date(item.createdAt);
     const from = dateFrom ? new Date(dateFrom) : null;
     const to = dateTo ? new Date(dateTo + 'T23:59:59') : null;
     return matchesSearch && matchesStatus && matchesCategory && (from ? itemDate >= from : true) && (to ? itemDate <= to : true);
   });
+
+  const activeStatus = statusFilter === null ? null : statusFilter;
+  const activeButtonColors = activeStatus && activeStatus !== 'All'
+    ? STATUS_BUTTON_COLORS[activeStatus]
+    : null;
 
   if (loading) {
     return (
@@ -358,7 +402,6 @@ const FeedbackManagement = () => {
       {/* ── Header ── */}
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-violet-400 mb-1">Admin Panel</p>
           <h1 className="text-3xl font-bold text-white">Feedback Management</h1>
           <p className="text-gray-400 text-sm mt-1">Review, respond, and manage student submissions.</p>
         </div>
@@ -391,32 +434,72 @@ const FeedbackManagement = () => {
         <div className="relative status-dropdown-wrapper">
           <button
             onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-all ${
-              statusFilter !== 'All' ? 'bg-violet-500/20 border-violet-500/40 text-violet-300' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'
-            }`}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-all"
+            style={
+              activeButtonColors
+                ? {
+                    background: activeButtonColors.bg,
+                    borderColor: activeButtonColors.border,
+                    color: activeButtonColors.color,
+                    // solid shadow so it pops in light mode
+                    boxShadow: isLightMode ? `0 2px 12px ${activeButtonColors.bg}99` : undefined,
+                  }
+                : {
+                    background: isLightMode ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.05)',
+                    borderColor: isLightMode ? 'rgba(196,181,253,0.5)' : 'rgba(255,255,255,0.1)',
+                    color: isLightMode ? '#4c1d95' : '#9ca3af',
+                  }
+            }
           >
             <Filter className="w-4 h-4" />
-            <span>{statusFilter === 'All' ? 'Filter Status' : statusFilter}</span>
-            {statusFilter !== 'All' && (
-              <span className="bg-violet-500/30 text-violet-300 text-xs px-1.5 py-0.5 rounded-full font-bold">
-                {feedback.filter(f => f.status === statusFilter).length}
+            <span>{statusFilter === null ? 'Filter Status' : statusFilter}</span>
+            {activeStatus && activeStatus !== 'All' && (
+              <span
+                className="text-xs px-1.5 py-0.5 rounded-full font-bold"
+                style={{
+                  background: isLightMode ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.2)',
+                  color: activeButtonColors?.color || '#fff',
+                }}
+              >
+                {feedback.filter(f => f.status === activeStatus).length}
               </span>
             )}
             <ChevronDown className={`w-4 h-4 transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} />
           </button>
+
           {showStatusDropdown && (
             <div className="absolute right-0 top-full mt-2 w-52 rounded-xl overflow-hidden z-50 shadow-2xl" style={dropdownPanelStyle}>
               {STATUS_TABS.map(tab => {
                 const count = tab === 'All' ? feedback.length : feedback.filter(f => f.status === tab).length;
-                const isActive = statusFilter === tab;
+                const isActive = tab === 'All'
+                  ? (statusFilter === null || statusFilter === 'All')
+                  : statusFilter === tab;
+                const palette = STATUS_DROPDOWN_COLORS[tab];
+                const c = isLightMode ? palette.activeLight : palette.active;
+
                 return (
-                  <button key={tab} onClick={() => { setStatusFilter(tab); setShowStatusDropdown(false); }}
-                    className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-all ${isActive ? dropdownItemActiveStyle : dropdownItemInactiveStyle}`}>
+                  <button
+                    key={tab}
+                    onClick={() => { setStatusFilter(tab); setShowStatusDropdown(false); }}
+                    className="w-full flex items-center justify-between px-4 py-3 text-sm transition-all"
+                    style={isActive
+                      ? { background: c.bg, borderLeft: `3px solid ${c.border}`, color: c.color }
+                      : { color: isLightMode ? '#374151' : '#9ca3af' }
+                    }
+                  >
                     <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${statusDotColors[tab]}`} />
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: palette.dot }} />
                       <span className={isActive ? 'font-semibold' : ''}>{tab}</span>
                     </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${isActive ? dropdownBadgeActiveStyle : dropdownBadgeInactiveStyle}`}>{count}</span>
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full font-bold"
+                      style={isActive
+                        ? { background: c.badge, color: c.color, border: `1px solid ${c.border}` }
+                        : { background: isLightMode ? '#f3f4f6' : 'rgba(255,255,255,0.08)', color: isLightMode ? '#6b7280' : '#6b7280' }
+                      }
+                    >
+                      {count}
+                    </span>
                   </button>
                 );
               })}
@@ -431,11 +514,23 @@ const FeedbackManagement = () => {
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-all ${
               categoryFilter !== 'All' ? 'bg-pink-500/20 border-pink-500/40 text-pink-300' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'
             }`}
+            style={
+              categoryFilter !== 'All' && isLightMode
+                ? { background: '#db2777', borderColor: '#be185d', color: '#ffffff', boxShadow: '0 2px 12px rgba(219,39,119,0.35)' }
+                : undefined
+            }
           >
             <span className="text-base leading-none">{selectedCategoryObj ? selectedCategoryObj.icon : '🗂️'}</span>
             <span className="max-w-[120px] truncate">{categoryFilter === 'All' ? 'Filter Category' : selectedCategoryObj?.name || 'Category'}</span>
             {categoryFilter !== 'All' && (
-              <span className="bg-pink-500/30 text-pink-300 text-xs px-1.5 py-0.5 rounded-full font-bold">
+              <span
+                className="text-xs px-1.5 py-0.5 rounded-full font-bold"
+                style={
+                  isLightMode
+                    ? { background: 'rgba(255,255,255,0.3)', color: '#ffffff' }
+                    : { background: 'rgba(236,72,153,0.3)', color: '#f9a8d4' }
+                }
+              >
                 {feedback.filter(f => f.category?._id === categoryFilter).length}
               </span>
             )}
@@ -474,11 +569,23 @@ const FeedbackManagement = () => {
           )}
         </div>
 
+        {/* ── Date Range Button — inline style for light/dark mode ── */}
         <button
           onClick={() => setShowDateFilter(!showDateFilter)}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-all ${
-            (dateFrom || dateTo) ? 'bg-violet-500/20 border-violet-500/40 text-violet-300' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'
-          }`}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-all"
+          style={
+            (dateFrom || dateTo)
+              ? {
+                  background: 'rgba(139,92,246,0.15)',
+                  borderColor: 'rgba(109,40,217,0.4)',
+                  color: isLightMode ? '#6d28d9' : '#a78bfa',
+                }
+              : {
+                  background: isLightMode ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.05)',
+                  borderColor: isLightMode ? 'rgba(196,181,253,0.5)' : 'rgba(255,255,255,0.1)',
+                  color: isLightMode ? '#4c1d95' : '#9ca3af',
+                }
+          }
         >
           <Calendar className="w-4 h-4" />
           {(dateFrom || dateTo) ? 'Date filtered' : 'Date range'}
@@ -503,7 +610,7 @@ const FeedbackManagement = () => {
       {/* ── Results count ── */}
       <p className="text-gray-500 text-xs">
         Showing <span className="text-white font-semibold">{filteredFeedback.length}</span> of <span className="text-white font-semibold">{feedback.length}</span> feedback
-        {statusFilter !== 'All' && <span className="ml-2 text-violet-400">· {statusFilter}</span>}
+        {statusFilter !== null && statusFilter !== 'All' && <span className="ml-2 text-violet-400">· {statusFilter}</span>}
         {categoryFilter !== 'All' && selectedCategoryObj && (
           <span className="ml-2 text-pink-400">· {selectedCategoryObj.icon} {selectedCategoryObj.name}</span>
         )}
@@ -543,7 +650,6 @@ const FeedbackManagement = () => {
                 const isOthers = item.category?.name?.toLowerCase().trim() === 'others' || item.category?.name?.toLowerCase().trim() === 'other';
                 return (
                   <tr key={item._id} className="group transition-all hover:bg-white/[0.04]" style={{ borderBottom: '1px solid rgba(0,0,0,0.25)' }}>
-                    {/* ── Student ── */}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         {showNew && (
@@ -578,8 +684,6 @@ const FeedbackManagement = () => {
                         {showNew && <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded-full font-black tracking-wide shrink-0">NEW</span>}
                       </div>
                     </td>
-
-                    {/* ── Category cell — shows "Others: specification" if applicable ── */}
                     <td className="px-6 py-4">
                       <div className="inline-flex flex-col gap-0.5" style={{ width: '180px', minWidth: '180px' }}>
                         <span className="inline-flex items-center gap-1.5 text-sm text-gray-300 bg-white/5 border border-white/10 px-3 py-1 rounded-lg">
@@ -593,7 +697,6 @@ const FeedbackManagement = () => {
                         )}
                       </div>
                     </td>
-
                     {isAdmin && (
                       <td className="px-6 py-4">
                         {item.lastUpdatedBy ? (
@@ -663,7 +766,6 @@ const FeedbackManagement = () => {
               border: isLightMode ? '1px solid rgba(196,181,253,0.5)' : '1px solid rgba(255,255,255,0.12)',
               boxShadow: isLightMode ? '0 25px 60px rgba(109,40,217,0.15)' : '0 25px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(109,40,217,0.2)',
             }}>
-            {/* Modal Header */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 shrink-0">
               <div>
                 <h2 className="text-base font-bold" style={{ color: isLightMode ? '#1e1b4b' : '#ffffff' }}>Feedback Details</h2>
@@ -680,9 +782,7 @@ const FeedbackManagement = () => {
               </div>
             </div>
 
-            {/* Two-column body */}
             <div className="flex flex-1 min-h-0 divide-x divide-white/10">
-              {/* LEFT */}
               <div className="flex-1 overflow-y-auto p-4 space-y-2 min-w-0">
                 <div className="grid grid-cols-2 gap-1.5">
                   {[
@@ -693,7 +793,6 @@ const FeedbackManagement = () => {
                       badge: selectedFeedback.isAnonymous ? (isAdmin ? '🕵️ Submitted Anonymously' : '🕵️ Anonymous') : null,
                     },
                     { label: 'Subject', value: selectedFeedback.subject },
-                    // ── Category field: shows specification below if Others ──
                     {
                       label: 'Category',
                       value: `${selectedFeedback.category?.icon || ''} ${selectedFeedback.category?.name || ''}`,
@@ -763,7 +862,6 @@ const FeedbackManagement = () => {
                 )}
               </div>
 
-              {/* RIGHT */}
               <div className="feedback-modal-right w-72 shrink-0 p-4 flex flex-col gap-3" style={{ background: isLightMode ? 'rgba(237,233,254,0.4)' : 'transparent' }}>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: isLightMode ? '#4c1d95' : '#9ca3af' }}>Update Feedback</p>

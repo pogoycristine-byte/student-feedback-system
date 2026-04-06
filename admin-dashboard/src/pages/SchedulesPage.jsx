@@ -117,7 +117,11 @@ const SchedulesPage = () => {
             {sorted.map((s, i) => {
               const label = getLabel(s.date);
               return (
-                <div key={i} className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-4 hover:bg-white/15 transition-all">
+                <div
+                  key={i}
+                  className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-4 hover:bg-white/15 transition-all cursor-pointer"
+                  onClick={() => navigate(`/feedback?open=${s.feedbackId}`)}
+                >
                   <div className="flex items-start gap-4">
                     <div className="p-2.5 rounded-xl bg-violet-500/20 shrink-0">
                       <CalendarClock className="w-5 h-5 text-violet-400" />
@@ -137,19 +141,19 @@ const SchedulesPage = () => {
                     </div>
                     <div className="flex flex-col gap-2 shrink-0">
                       <button
-                        onClick={() => navigate(`/feedback?open=${s.feedbackId}`)}
+                        onClick={(e) => { e.stopPropagation(); navigate(`/feedback?open=${s.feedbackId}`); }}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-500/20 hover:bg-violet-500/30 text-violet-300 text-xs rounded-lg transition-all border border-violet-500/30"
                       >
                         View <ChevronRight className="w-3 h-3" />
                       </button>
                       <button
-                        onClick={() => openEdit(s)}
+                        onClick={(e) => { e.stopPropagation(); openEdit(s); }}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs rounded-lg transition-all border border-blue-500/30"
                       >
                         <Pencil className="w-3 h-3" /> Edit
                       </button>
                       <button
-                        onClick={() => deleteSchedule(s.feedbackId)}
+                        onClick={(e) => { e.stopPropagation(); deleteSchedule(s.feedbackId); }}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs rounded-lg transition-all border border-red-500/20"
                       >
                         <Trash2 className="w-3 h-3" /> Delete
@@ -186,18 +190,8 @@ const SchedulesPage = () => {
                 </div>
 
                 <div className="bg-white/5 rounded-xl p-4 mb-5 border border-white/10">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
-                      style={{ background: 'linear-gradient(135deg, #6D28D9, #BE185D)' }}
-                    >
-                      {editModal.studentName?.[0]?.toUpperCase() || '?'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-semibold truncate">{editModal.studentName}</p>
-                      <p className="text-gray-400 text-xs truncate">{editModal.subject}</p>
-                    </div>
-                  </div>
+                  <p className="text-white text-sm font-semibold truncate">{editModal.studentName}</p>
+                  <p className="text-gray-400 text-xs truncate">{editModal.subject}</p>
                 </div>
 
                 <div className="mb-4">
