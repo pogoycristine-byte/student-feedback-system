@@ -16,6 +16,7 @@ import {
   MessagesSquare,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import lasLogo from '../las.png';
 import { feedbackAPI, messagesAPI } from '../services/api';
 import { getSchedules } from '../utils/scheduleHelpers';
 
@@ -63,19 +64,73 @@ const getDueStatus = (item) => {
 };
 
 const SectionLabel = ({ label }) => (
-  <p
+  <div
+    className="sidebar-section-label"
     style={{
-      color: 'rgba(255,255,255,0.38)',
+      color: 'rgba(255,255,255,0.55)',
       fontSize: '9px',
       fontWeight: 700,
       letterSpacing: '0.1em',
       textTransform: 'uppercase',
-      padding: '8px 12px 2px',
+      padding: '6px 12px 2px',
     }}
   >
     {label}
-  </p>
+  </div>
 );
+
+// ── Real Logo Component using las.png ────────────────────────────────────────
+const TempLogo = () => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '28px', marginTop: '6px' }}>
+    {/* Circular logo image */}
+    <img
+      src={lasLogo}
+      alt="ClassBack Logo"
+      style={{
+        width: '56px',
+        height: '56px',
+        borderRadius: '50%',
+        objectFit: 'contain',
+        flexShrink: 0,
+        boxShadow: '0 4px 18px rgba(124, 58, 237, 0.55)',
+        border: '2px solid rgba(167, 139, 250, 0.4)',
+        background: 'rgba(255,255,255,0.08)',
+      }}
+    />
+
+    {/* Wordmark */}
+    <div style={{ lineHeight: 1.2 }}>
+      <span
+        style={{
+          display: 'block',
+          fontSize: '20px',
+          fontWeight: 700,
+          background: 'linear-gradient(90deg, #a78bfa, #f472b6)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          letterSpacing: '-0.3px',
+        }}
+      >
+        ClassBack
+      </span>
+      <span
+        style={{
+          display: 'block',
+          fontSize: '10.5px',
+          color: 'rgba(255,255,255,0.35)',
+          fontWeight: 500,
+          letterSpacing: '0.03em',
+          marginTop: '3px',
+          lineHeight: 1.4,
+        }}
+      >
+        Classroom Feedback &amp; Suggestion
+      </span>
+    </div>
+  </div>
+);
+// ─────────────────────────────────────────────────────────────────────────────
 
 const Sidebar = () => {
   const { logout, user } = useAuth();
@@ -212,6 +267,7 @@ const Sidebar = () => {
       items: [
         { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { name: 'Announcements', path: '/announcements', icon: Megaphone },
+        { name: 'Messages', path: '/messages', icon: MessagesSquare, badge: unreadDmCount },
       ],
     },
     {
@@ -220,12 +276,6 @@ const Sidebar = () => {
         { name: 'Manage Feedback', path: '/feedback', icon: MessageSquare, badge: totalBadge, overdueBadge: overdueCount },
         { name: 'Manage Categories', path: '/categories', icon: FolderOpen },
         { name: 'Manage Users', path: '/students', icon: Users },
-      ],
-    },
-    {
-      label: 'Communication',
-      items: [
-        { name: 'Messages', path: '/messages', icon: MessagesSquare, badge: unreadDmCount },
       ],
     },
     {
@@ -248,6 +298,7 @@ const Sidebar = () => {
       items: [
         { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { name: 'Announcements', path: '/announcements', icon: Megaphone },
+        { name: 'Messages', path: '/messages', icon: MessagesSquare, badge: unreadDmCount },
       ],
     },
     {
@@ -261,12 +312,6 @@ const Sidebar = () => {
       label: 'Schedule',
       items: [
         { name: 'My Schedules', path: '/schedules', icon: CalendarClock, badge: dueSoonCount },
-      ],
-    },
-    {
-      label: 'Communication',
-      items: [
-        { name: 'Messages', path: '/messages', icon: MessagesSquare, badge: unreadDmCount },
       ],
     },
   ];
@@ -286,9 +331,9 @@ const Sidebar = () => {
               : 'text-gray-400 hover:bg-white/10 hover:text-white'
           }`
         }
-        style={{ padding: '6px 10px', fontSize: '13px' }}
+        style={{ padding: '5px 10px', fontSize: '14px' }}
       >
-        <Icon style={{ width: '14px', height: '14px', flexShrink: 0 }} />
+        <Icon style={{ width: '16px', height: '16px', flexShrink: 0 }} />
         <span style={{ fontWeight: 500 }}>{item.name}</span>
         <div className="ml-auto flex items-center gap-1">
           {item.overdueBadge > 0 && (
@@ -324,9 +369,13 @@ const Sidebar = () => {
     >
       {/* Header */}
       <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+        {/* ── REAL LOGO (las.png) ── */}
+        <TempLogo />
+        {/* ───────────────────────── */}
+
         <h1
           className="font-bold bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent"
-          style={{ fontSize: '18px', lineHeight: 1.2 }}
+          style={{ fontSize: '18px', lineHeight: 1.2, marginTop: '14px' }}
         >
           {isAdmin ? 'Admin Panel' : 'Staff Panel'}
         </h1>
@@ -344,9 +393,9 @@ const Sidebar = () => {
       </div>
 
       {/* Nav groups */}
-      <nav className="flex-1 overflow-y-auto" style={{ padding: '4px 8px' }}>
+      <nav className="flex-1 overflow-y-auto" style={{ padding: '2px 8px' }}>
         {groups.map((group) => (
-          <div key={group.label} style={{ marginBottom: '4px' }}>
+          <div key={group.label} style={{ marginBottom: '0px' }}>
             <SectionLabel label={group.label} />
             {group.items.map((item) => renderItem(item))}
           </div>

@@ -1100,3 +1100,24 @@ select:focus {
 .light-mode .messages-name {
   color: #1e1b4b !important;
 }
+/* Sidebar section labels — keep faint in both modes */
+.w-64 .sidebar-section-label {
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+.light-mode .w-64 .sidebar-section-label {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+/* ===================================
+   LIGHT MODE — MESSAGES PAGE TITLE
+   =================================== */
+
+.light-mode .messages-page-title {
+  background: linear-gradient(90deg, #4c1d95, #86198f) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+
+.light-mode .messages-page-subtitle {
+  color: #374151 !important;
+}

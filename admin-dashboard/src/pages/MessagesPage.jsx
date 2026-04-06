@@ -177,13 +177,58 @@ const MessagesPage = () => {
   return (
     <div className="flex flex-col h-full" style={{ padding: '20px' }}>
 
+      {/* ── PAGE TITLE ── */}
+      <div style={{ marginBottom: '16px' }}>
+        <div className="flex items-center gap-3">
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #7c3aed, #db2777)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              boxShadow: '0 4px 14px rgba(124,58,237,0.4)',
+            }}
+          >
+            <MessagesSquare style={{ width: 18, height: 18, color: '#fff' }} />
+          </div>
+          <div>
+            <h1
+              className="messages-page-title"
+              style={{
+                fontSize: '22px',
+                fontWeight: 700,
+                background: 'linear-gradient(90deg, #a78bfa, #f472b6)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                lineHeight: 1.2,
+                margin: 0,
+              }}
+            >
+              Messages
+            </h1>
+            <p
+              className="messages-page-subtitle"
+              style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', margin: 0, marginTop: 2 }}
+            >
+              {isAdmin ? 'Direct messages with staff members' : 'Your conversations'}
+            </p>
+          </div>
+        </div>
+      </div>
+      {/* ─────────────── */}
+
       {/* Main panel */}
       <div
         className="flex flex-1 rounded-xl overflow-hidden"
         style={{
           border: '1.5px solid rgba(0,0,0,0.15)',
           minHeight: 0,
-          height: 'calc(100vh - 80px)',
+          height: 'calc(100vh - 120px)',
           background: 'rgba(255,255,255,0.03)',
         }}
       >

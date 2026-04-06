@@ -29,7 +29,7 @@ const isUserOnline = (user) => {
   const ts = user.lastSeen || user.lastLogin;
   if (!ts) return false;
   const diffSecs = Math.floor((new Date() - new Date(ts)) / 1000);
-  return diffSecs < 60; // ← was 30, now 60
+  return diffSecs < 60;
 };
 const formatLastLogin = (dateStr) => {
   if (!dateStr) return { label: 'Never', color: 'text-gray-600', dot: 'bg-gray-600', time: null };
@@ -91,7 +91,6 @@ const Students = () => {
   useEffect(() => {
     fetchAllUsers();
 
-    // ── Poll every 5 seconds to match heartbeat ──
     pollRef.current = setInterval(() => {
       fetchAllUsers(true);
     }, 10 * 1000);
@@ -247,7 +246,6 @@ const Students = () => {
       {/* ── Header ── */}
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-violet-400 mb-1">Admin Panel</p>
           <h1 className="text-3xl font-bold text-white">User Management</h1>
           <p className="text-gray-400 text-sm mt-1">Manage all users — students, staff, and admins.</p>
         </div>

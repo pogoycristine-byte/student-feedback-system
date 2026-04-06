@@ -88,7 +88,6 @@ const STATUS_DROPDOWN_COLORS = {
   },
 };
 
-// ── SOLID light-mode colors for the active status trigger button ──
 const STATUS_BUTTON_COLORS_DARK = {
   All:            { bg: 'rgba(107,114,128,0.2)', border: 'rgba(107,114,128,0.4)', color: '#9ca3af' },
   Pending:        { bg: 'rgba(234,179,8,0.2)',   border: 'rgba(234,179,8,0.4)',   color: '#fbbf24' },
@@ -123,6 +122,50 @@ const getCategoryLabel = (item) => {
     return `${item.category?.icon || ''} ${baseName}: ${item.otherSpecification}`;
   }
   return `${item.category?.icon || ''} ${baseName}`;
+};
+
+// ── Student Avatar helper ──
+const StudentAvatar = ({ src, name, size = 34 }) => {
+  const [imgError, setImgError] = useState(false);
+  const initials = name
+    ? name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+    : '?';
+  const colors = [
+    ['#7c3aed', '#4c1d95'], ['#db2777', '#831843'], ['#0369a1', '#0c4a6e'],
+    ['#059669', '#064e3b'], ['#d97706', '#78350f'], ['#dc2626', '#7f1d1d'],
+  ];
+  const colorPair = colors[(name?.charCodeAt(0) || 0) % colors.length];
+
+  if (src && !imgError) {
+    return (
+      <img
+        src={src}
+        alt={name}
+        onError={() => setImgError(true)}
+        style={{
+          width: size, height: size,
+          borderRadius: '50%',
+          objectFit: 'cover',
+          border: '2px solid rgba(139,92,246,0.4)',
+          flexShrink: 0,
+        }}
+      />
+    );
+  }
+  return (
+    <div style={{
+      width: size, height: size,
+      borderRadius: '50%',
+      background: `linear-gradient(135deg, ${colorPair[0]}, ${colorPair[1]})`,
+      border: '2px solid rgba(139,92,246,0.4)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+      fontSize: size * 0.35, fontWeight: 700, color: '#fff',
+      letterSpacing: '0.5px',
+    }}>
+      {initials}
+    </div>
+  );
 };
 
 const FeedbackManagement = () => {
@@ -332,7 +375,6 @@ const FeedbackManagement = () => {
     : { background: '#1a1025', border: '1px solid rgba(255,255,255,0.15)', colorScheme: 'dark', color: '#ffffff' };
   const optionStyle = isLightMode ? { background: '#ffffff', color: '#1e1b4b' } : { background: '#1a1025' };
 
-  // ── Pick the right button color table based on mode ──
   const STATUS_BUTTON_COLORS = isLightMode ? STATUS_BUTTON_COLORS_LIGHT : STATUS_BUTTON_COLORS_DARK;
 
   const getStatusBadge = (status) => {
@@ -441,7 +483,6 @@ const FeedbackManagement = () => {
                     background: activeButtonColors.bg,
                     borderColor: activeButtonColors.border,
                     color: activeButtonColors.color,
-                    // solid shadow so it pops in light mode
                     boxShadow: isLightMode ? `0 2px 12px ${activeButtonColors.bg}99` : undefined,
                   }
                 : {
@@ -569,7 +610,7 @@ const FeedbackManagement = () => {
           )}
         </div>
 
-        {/* ── Date Range Button — inline style for light/dark mode ── */}
+        {/* ── Date Range Button ── */}
         <button
           onClick={() => setShowDateFilter(!showDateFilter)}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-all"
@@ -648,18 +689,43 @@ const FeedbackManagement = () => {
                 const dueStatus = getDueStatus(item);
                 const dueBadge = dueStatus ? DUE_BADGE[dueStatus] : null;
                 const isOthers = item.category?.name?.toLowerCase().trim() === 'others' || item.category?.name?.toLowerCase().trim() === 'other';
+                // For anonymous: show a masked avatar; for real students: show their profile picture
+                const isAnonymousHidden = item.isAnonymous && !isAdmin;
                 return (
                   <tr key={item._id} className="group transition-all hover:bg-white/[0.04]" style={{ borderBottom: '1px solid rgba(0,0,0,0.25)' }}>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2.5">
+                        {/* ── NEW: red "new" dot ── */}
                         {showNew && (
                           <div className="relative shrink-0">
                             <div className="w-2 h-2 bg-red-500 rounded-full" />
                             <div className="absolute inset-0 w-2 h-2 bg-red-500 rounded-full animate-ping opacity-75" />
                           </div>
                         )}
+
+                        {/* ── NEW: profile picture / anonymous avatar ── */}
+                        {isAnonymousHidden ? (
+                          // Masked silhouette for anonymous (non-admin view)
+                          <div style={{
+                            width: 34, height: 34, borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.08)',
+                            border: '2px solid rgba(255,255,255,0.15)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            flexShrink: 0, fontSize: 16,
+                          }}>
+                            🕵️
+                          </div>
+                        ) : (
+                          <StudentAvatar
+                            src={item.student?.profilePicture}
+                            name={item.student?.name}
+                            size={34}
+                          />
+                        )}
+
+                        {/* ── name + studentId ── */}
                         <div>
-                          {item.isAnonymous && !isAdmin ? (
+                          {isAnonymousHidden ? (
                             <div className="flex items-center gap-1.5">
                               <span className="text-gray-400 text-sm font-semibold italic">Anonymous</span>
                               <span className="text-[9px] bg-gray-500/20 text-gray-400 border border-gray-500/30 px-1.5 py-0.5 rounded-full font-semibold">🕵️ Hidden</span>
@@ -767,9 +833,27 @@ const FeedbackManagement = () => {
               boxShadow: isLightMode ? '0 25px 60px rgba(109,40,217,0.15)' : '0 25px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(109,40,217,0.2)',
             }}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 shrink-0">
-              <div>
-                <h2 className="text-base font-bold" style={{ color: isLightMode ? '#1e1b4b' : '#ffffff' }}>Feedback Details</h2>
-                <p className="text-xs" style={{ color: isLightMode ? '#6b7280' : '#9ca3af' }}>Review and respond to this submission</p>
+              <div className="flex items-center gap-3">
+                {/* ── Modal header: profile picture next to title ── */}
+                {selectedFeedback.isAnonymous && !isAdmin ? (
+                  <div style={{
+                    width: 38, height: 38, borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '2px solid rgba(255,255,255,0.15)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 18, flexShrink: 0,
+                  }}>🕵️</div>
+                ) : (
+                  <StudentAvatar
+                    src={selectedFeedback.student?.profilePicture}
+                    name={selectedFeedback.student?.name}
+                    size={38}
+                  />
+                )}
+                <div>
+                  <h2 className="text-base font-bold" style={{ color: isLightMode ? '#1e1b4b' : '#ffffff' }}>Feedback Details</h2>
+                  <p className="text-xs" style={{ color: isLightMode ? '#6b7280' : '#9ca3af' }}>Review and respond to this submission</p>
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 {getStatusBadge(selectedFeedback.status)}
@@ -810,7 +894,7 @@ const FeedbackManagement = () => {
                     selectedFeedback.lastUpdatedBy ? { label: 'Last Updated By', value: selectedFeedback.lastUpdatedBy?.name, badge: selectedFeedback.lastUpdatedBy?.role } : null,
                   ].filter(Boolean).map((field, i) => (
                     <div key={i} className="rounded-lg px-3 py-2" style={{ background: isLightMode ? 'rgba(109,40,217,0.06)' : 'rgba(255,255,255,0.04)', border: isLightMode ? '1.5px solid #c4b5fd' : '1px solid rgba(255,255,255,0.08)' }}>
-                      <p className="text-[9px] uppercase tracking-widest font-semibold mb-0.5" style={{ color: isLightMode ? '#4c1d95' : '#6b7280' }}>{field.label}</p>
+                      <p className="text-[9px] uppercase tracking-widests font-semibold mb-0.5" style={{ color: isLightMode ? '#4c1d95' : '#6b7280' }}>{field.label}</p>
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="text-sm font-medium leading-snug" style={{ color: isLightMode ? '#1e1b4b' : '#ffffff' }}>{field.value}</p>
                         {field.badge && <span className="text-[10px] bg-violet-500/30 text-violet-300 px-1.5 py-0.5 rounded-full">{field.badge}</span>}

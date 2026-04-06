@@ -57,7 +57,6 @@ const CategoryManagement = () => {
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
-  // ── NEW: global feedback panel state ──
   const [globalFeedback, setGlobalFeedback] = useState([]);
   const [globalFeedbackLoading, setGlobalFeedbackLoading] = useState(false);
   const [showGlobalPanel, setShowGlobalPanel] = useState(false);
@@ -66,7 +65,6 @@ const CategoryManagement = () => {
   const [editingCategory, setEditingCategory] = useState(null);
   const [categoryFormData, setCategoryFormData] = useState({ name: '', description: '', icon: '📝' });
 
-  // ── Detail modal (same as FeedbackManagement eye modal) ──
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedFeedback, setSelectedFeedback] = useState(null);
   const [adminComment, setAdminComment] = useState('');
@@ -144,7 +142,7 @@ const CategoryManagement = () => {
 
   const fetchCategoryFeedback = async (category) => {
     setSelectedCategory(category);
-    setShowGlobalPanel(false); // close global panel when a category is selected
+    setShowGlobalPanel(false);
     setFeedbackLoading(true);
     setCategoryFeedback([]);
     try {
@@ -158,7 +156,6 @@ const CategoryManagement = () => {
     }
   };
 
-  // ── NEW: fetch all feedback globally by status ──
   const fetchGlobalFeedback = async (status) => {
     setGlobalFeedbackLoading(true);
     setGlobalFeedback([]);
@@ -229,7 +226,6 @@ const CategoryManagement = () => {
     }
   };
 
-  // ── Open detail modal (same as eye icon in FeedbackManagement) ──
   const handleViewDetails = (item) => {
     setSelectedFeedback(item);
     setNewStatus(item.status);
@@ -271,20 +267,17 @@ const CategoryManagement = () => {
     }
   };
 
-  // ── UPDATED: handleStatusFilter now also opens global panel when no category selected ──
   const handleStatusFilter = (tab) => {
     setStatusFilter(tab);
     setShowStatusDropdown(false);
 
     if (selectedCategory) {
-      // existing per-category filter logic — unchanged
       setFeedbackLoading(true);
       feedbackAPI.getAll({ category: selectedCategory._id, ...(tab !== 'All' && { status: tab }) })
         .then(res => setCategoryFeedback(res.data.feedback))
         .catch(console.error)
         .finally(() => setFeedbackLoading(false));
     } else {
-      // NEW: no category selected → show global panel
       setShowGlobalPanel(true);
       fetchGlobalFeedback(tab);
     }
@@ -323,7 +316,6 @@ const CategoryManagement = () => {
     return counts;
   };
 
-  // ── NEW: get global counts across all categories ──
   const getGlobalStatusCounts = () => {
     const counts = { Pending: 0, 'Under Review': 0, Resolved: 0, Rejected: 0 };
     Object.values(allCategoryFeedbackMap).forEach(items => {
@@ -385,12 +377,10 @@ const CategoryManagement = () => {
     );
   }
 
-  // ── NEW: Global Feedback Panel (shown when no category selected but filter is active) ──
   const renderGlobalPanel = () => {
     const globalCounts = getGlobalStatusCounts();
     return (
       <div className="rounded-2xl border border-white/10 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)' }}>
-        {/* Panel Header */}
         <div className="px-5 py-4 flex items-center justify-between border-b border-white/10" style={{ background: 'rgba(255,255,255,0.04)' }}>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center">
@@ -514,7 +504,6 @@ const CategoryManagement = () => {
       {/* Header */}
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-violet-400 mb-1">Admin Panel</p>
           <h1 className="text-3xl font-bold text-white">Category Management</h1>
           <p className="text-gray-400 text-sm mt-1">Manage feedback categories and browse submissions by category.</p>
         </div>
@@ -562,13 +551,11 @@ const CategoryManagement = () => {
             style={statusFilter !== null ? getFilterBtnActiveStyle(statusFilter ?? 'All') : {}}
           >
             <Filter className="w-4 h-4" />
-            
             <span>{statusFilter === null ? 'Filter Status' : statusFilter}</span>
             <ChevronDown className={`w-4 h-4 transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} />
           </button>
           {showStatusDropdown && (
             <div className="absolute right-0 top-full mt-2 w-52 rounded-xl overflow-hidden z-50 shadow-2xl" style={dropdownPanelStyle}>
-              {/* hint label */}
               <p className="px-4 pt-2.5 pb-1 text-[10px] uppercase tracking-widest font-semibold" style={{ color: isLightMode ? '#9ca3af' : '#4b5563' }}>
                 {selectedCategory ? `Filter · ${selectedCategory.name}` : 'Filter · All Categories'}
               </p>
@@ -693,7 +680,6 @@ const CategoryManagement = () => {
 
         {/* Feedback Panel */}
         <div className="lg:col-span-2">
-          {/* ── NEW: show global panel when no category is selected but filter is triggered ── */}
           {showGlobalPanel && !selectedCategory ? renderGlobalPanel() :
 
           !selectedCategory ? (
@@ -714,7 +700,6 @@ const CategoryManagement = () => {
             </div>
           ) : (
             <div className="rounded-2xl border border-white/10 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)' }}>
-              {/* Panel Header */}
               <div className="px-5 py-4 flex items-center justify-between border-b border-white/10" style={{ background: 'rgba(255,255,255,0.04)' }}>
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-lg">
@@ -865,7 +850,7 @@ const CategoryManagement = () => {
         </div>
       )}
 
-      {/* ── Full Detail Modal (same as FeedbackManagement eye modal) ── */}
+      {/* Full Detail Modal */}
       {showDetailModal && selectedFeedback && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="feedback-modal rounded-2xl w-full flex flex-col"
