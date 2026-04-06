@@ -1093,3 +1093,10 @@ select:focus {
 .light-mode .category-dropdown-wrapper button.bg-pink-500\/20 .text-pink-300 {
   color: #ffffff !important;
 }
+/* ===================================
+   LIGHT MODE — MESSAGES PAGE NAME TEXT
+   =================================== */
+
+.light-mode .messages-name {
+  color: #1e1b4b !important;
+}

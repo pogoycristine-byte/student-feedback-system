@@ -35,9 +35,18 @@ const MessagesPage = () => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [mobileShowChat, setMobileShowChat] = useState(false);
+  const [isLightMode, setIsLightMode] = useState(document.body.classList.contains('light-mode'));
 
   const bottomRef = useRef(null);
   const pollRef = useRef(null);
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsLightMode(document.body.classList.contains('light-mode'));
+    });
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   const loadList = useCallback(async () => {
     try {
@@ -245,10 +254,10 @@ const MessagesPage = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span
-                        className="truncate"
+                        className="truncate messages-name"
                         style={{
                           fontSize: 13,
-                          color: 'rgba(255, 255, 255, 0.75)',
+                          color: isLightMode ? '#1e1b4b' : 'rgba(255, 255, 255, 0.75)',
                           fontWeight: item.unread ? 700 : 500,
                         }}
                       >
