@@ -1,4 +1,5 @@
 const Feedback = require('../models/Feedback');
+const { createNotification } = require('../utils/notificationHelper'); // ✅ NEW
 
 // @desc    Submit new feedback with media
 exports.submitFeedback = async (req, res) => {
@@ -37,6 +38,16 @@ exports.submitFeedback = async (req, res) => {
 
     await feedback.populate('student', 'name studentId email yearLevel section');
     await feedback.populate('category', 'name');
+
+    // ✅ NEW
+    await createNotification({
+      type: 'new_feedback',
+      title: '📋 New Feedback Submitted',
+      message: `${isAnonymous ? 'Anonymous student' : feedback.student?.name} submitted: "${subject}"`,
+      feedbackId: feedback._id,
+      studentName: isAnonymous ? 'Anonymous' : feedback.student?.name || '',
+      targetRoles: ['admin', 'staff'],
+    });
 
     res.status(201).json({
       success: true,
@@ -117,7 +128,6 @@ exports.getFeedbackById = async (req, res) => {
 
     const feedbackObj = feedback.toObject();
     
-    // Mask student data for staff when feedback is anonymous
     if (feedbackObj.isAnonymous && req.user.role !== 'admin' && req.user.role !== 'student') {
       feedbackObj.student = {
         name: 'Anonymous Student',
@@ -176,19 +186,16 @@ exports.getAllFeedback = async (req, res) => {
     }
 
     const feedback = await Feedback.find(query)
-      .populate('student', 'name studentId email yearLevel section profilePicture') // ← added profilePicture
+      .populate('student', 'name studentId email yearLevel section profilePicture')
       .populate('category', 'name icon')
       .populate('adminResponse.respondedBy', 'name role')
       .populate('lastUpdatedBy', 'name role')
       .sort({ createdAt: -1 });
 
-    // Mask student data for staff when feedback is anonymous
     const processedFeedback = feedback.map(item => {
       const itemObj = item.toObject();
       
-      // If feedback is anonymous and current user is NOT admin
       if (itemObj.isAnonymous && req.user.role !== 'admin') {
-        // Mask student data for staff users — keep profilePicture null for anonymous
         itemObj.student = {
           name: 'Anonymous Student',
           studentId: null,
@@ -228,7 +235,8 @@ exports.updateFeedbackStatus = async (req, res) => {
       });
     }
 
-    const feedback = await Feedback.findById(req.params.id);
+    const feedback = await Feedback.findById(req.params.id)
+      .populate('student', 'name'); // ✅ NEW: populate for notification
 
     if (!feedback) {
       return res.status(404).json({
@@ -236,6 +244,8 @@ exports.updateFeedbackStatus = async (req, res) => {
         message: 'Feedback not found'
       });
     }
+
+    const oldStatus = feedback.status; // ✅ NEW
 
     feedback.status = status;
     feedback.lastUpdatedBy = req.user.id;
@@ -257,6 +267,18 @@ exports.updateFeedbackStatus = async (req, res) => {
 
     feedback.isRead = true;
     await feedback.save();
+
+    // ✅ NEW
+    if (oldStatus !== status) {
+      await createNotification({
+        type: 'status_changed',
+        title: '🔄 Feedback Status Updated',
+        message: `"${feedback.subject}" changed from ${oldStatus} → ${status}`,
+        feedbackId: feedback._id,
+        studentName: feedback.student?.name || '',
+        targetRoles: ['admin', 'staff'],
+      });
+    }
 
     await feedback.populate('student', 'name studentId email');
     await feedback.populate('category', 'name');
@@ -290,7 +312,6 @@ exports.deleteFeedback = async (req, res) => {
       });
     }
 
-    // Delete media from Cloudinary if present
     if (feedback.media && feedback.media.length > 0) {
       try {
         const { cloudinary } = require('../middleware/cloudinary');
@@ -334,7 +355,8 @@ exports.sendMessage = async (req, res) => {
       });
     }
 
-    const feedback = await Feedback.findById(req.params.id);
+    const feedback = await Feedback.findById(req.params.id)
+      .populate('student', 'name'); // ✅ NEW: populate for notification
 
     if (!feedback) {
       return res.status(404).json({
@@ -343,7 +365,7 @@ exports.sendMessage = async (req, res) => {
       });
     }
 
-    const isStudent = feedback.student.toString() === req.user.id;
+    const isStudent = feedback.student._id.toString() === req.user.id;
     const isAdminOrStaff = req.user.role === 'admin' || req.user.role === 'staff';
 
     if (!isStudent && !isAdminOrStaff) {
@@ -368,6 +390,18 @@ exports.sendMessage = async (req, res) => {
     }
 
     await feedback.save();
+
+    // ✅ NEW
+    if (req.user.role === 'student') {
+      await createNotification({
+        type: 'student_reply',
+        title: '💬 Student Replied',
+        message: `${feedback.student?.name || 'A student'} replied on: "${feedback.subject}"`,
+        feedbackId: feedback._id,
+        studentName: feedback.student?.name || '',
+        targetRoles: ['admin', 'staff'],
+      });
+    }
 
     await feedback.populate('messages.sender', 'name role');
 
@@ -416,7 +450,6 @@ exports.getMessages = async (req, res) => {
 
     const feedbackObj = feedback.toObject();
     
-    // Mask student data for staff when feedback is anonymous
     if (feedbackObj.isAnonymous && req.user.role === 'staff') {
       feedbackObj.student = {
         _id: feedbackObj.student._id,
@@ -449,8 +482,6 @@ exports.getMessages = async (req, res) => {
 };
 
 // @desc    Submit rating for resolved feedback
-// @route   PUT /api/feedback/:id/rate
-// @access  Private (Students only)
 exports.submitRating = async (req, res) => {
   try {
     const { satisfactionRating, satisfactionComment } = req.body;
