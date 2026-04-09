@@ -1,5 +1,6 @@
-const Message = require('../models/Message');
-const User    = require('../models/User');
+const Message      = require('../models/Message');
+const User         = require('../models/User');
+const Notification = require('../models/Notification'); // ← added
 
 // GET /api/messages/staff
 // Admin only — returns all staff/admin users except self (to start new DMs)
@@ -107,6 +108,35 @@ exports.sendMessage = async (req, res) => {
     });
     thread.updatedAt = new Date();
     await thread.save();
+
+    // ── DM Notification ──────────────────────────────────────────
+    try {
+      await thread.populate('participants', 'name role');
+
+      const recipient = thread.participants.find(
+        (p) => p._id.toString() !== senderId.toString()
+      );
+
+      if (recipient) {
+        const senderLabel = req.user.role === 'admin' ? 'Admin' : req.user.name;
+        const preview = message.trim().length > 60
+          ? message.trim().slice(0, 60) + '…'
+          : message.trim();
+
+        await Notification.create({
+          type:         'dm_message',
+          title:        `💬 New message from ${senderLabel}`,
+          message:      preview,
+          threadId:     thread._id,
+          targetUserId: recipient._id,
+          targetRoles:  [recipient.role],
+          readBy:       [],
+        });
+      }
+    } catch (notifErr) {
+      console.error('DM notification error:', notifErr);
+    }
+    // ─────────────────────────────────────────────────────────────
 
     const saved = thread.messages[thread.messages.length - 1];
     res.status(201).json({ message: saved, threadId: thread._id });

@@ -7,7 +7,10 @@ const Notification = require('../models/Notification');
 router.get('/', protect, requireAdminOrStaff, async (req, res) => {
   try {
     const notifications = await Notification.find({
-      targetRoles: req.user.role,
+      $or: [
+        { targetRoles: req.user.role, targetUserId: null },  // ← role-wide (feedback notifs)
+        { targetUserId: req.user._id },                       // ← DM notifs — only for me
+      ]
     })
       .sort({ createdAt: -1 })
       .limit(50)
@@ -31,7 +34,13 @@ router.get('/', protect, requireAdminOrStaff, async (req, res) => {
 router.put('/read-all', protect, requireAdminOrStaff, async (req, res) => {
   try {
     await Notification.updateMany(
-      { targetRoles: req.user.role, readBy: { $ne: req.user._id } },
+      {
+        $or: [
+          { targetRoles: req.user.role, targetUserId: null },
+          { targetUserId: req.user._id },
+        ],
+        readBy: { $ne: req.user._id }
+      },
       { $addToSet: { readBy: req.user._id } }
     );
     res.json({ success: true });
@@ -55,7 +64,12 @@ router.put('/:id/read', protect, requireAdminOrStaff, async (req, res) => {
 // DELETE /api/notifications/clear-all — MUST be before /:id
 router.delete('/clear-all', protect, requireAdminOrStaff, async (req, res) => {
   try {
-    await Notification.deleteMany({ targetRoles: req.user.role });
+    await Notification.deleteMany({
+      $or: [
+        { targetRoles: req.user.role, targetUserId: null },
+        { targetUserId: req.user._id },
+      ]
+    });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to clear notifications' });
