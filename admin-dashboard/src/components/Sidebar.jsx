@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   MessageSquare,
@@ -19,7 +19,124 @@ import { useAuth } from '../context/AuthContext';
 import lasLogo from '../las.png';
 import { feedbackAPI, messagesAPI } from '../services/api';
 import { getSchedules } from '../utils/scheduleHelpers';
+import NotificationBell from './NotificationBell';
 
+/* ─── Google Fonts injection ─────────────────────────────────────────────── */
+const fontLink = document.createElement('link');
+fontLink.rel = 'stylesheet';
+fontLink.href =
+  'https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap';
+if (!document.head.querySelector('[href*="DM+Serif"]')) {
+  document.head.appendChild(fontLink);
+}
+
+/* ─── Palette ───────────────────────────────────────────────────────────── */
+const C = {
+  bg: '#1a1333',
+  surface: '#221a42',
+  border: 'rgba(255,255,255,0.08)',
+  accent: '#7C3AED',
+  accentBright: '#a78bfa',
+  accentMuted: 'rgba(124,58,237,0.18)',
+  accentHover: 'rgba(255,255,255,0.07)',
+  text: '#f1eeff',
+  muted: 'rgba(200,190,240,0.45)',
+  subtle: 'rgba(200,190,240,0.70)',
+  danger: '#f87171',
+  dangerMuted: 'rgba(248,113,113,0.12)',
+  warn: '#fbbf24',
+  warnMuted: 'rgba(251,191,36,0.13)',
+};
+
+/* ─── Inline global styles ───────────────────────────────────────────────── */
+const injectStyles = () => {
+  if (document.getElementById('sidebar-formal-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'sidebar-formal-styles';
+  style.textContent = `
+    .sb-nav-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      color: ${C.subtle};
+      text-decoration: none;
+      transition: background 0.15s, color 0.15s;
+      position: relative;
+    }
+    .sb-nav-link:hover {
+      background: ${C.accentHover};
+      color: ${C.text};
+    }
+    .sb-nav-link.active {
+      background: linear-gradient(90deg, rgba(124,58,237,0.55), rgba(167,139,250,0.20));
+      color: #fff;
+      box-shadow: inset 0 0 0 1px rgba(167,139,250,0.20);
+    }
+    .sb-icon {
+      width: 15px;
+      height: 15px;
+      flex-shrink: 0;
+      opacity: 0.65;
+    }
+    .sb-nav-link.active .sb-icon {
+      opacity: 1;
+    }
+    .sb-badge-red {
+      background: ${C.danger};
+      color: #fff;
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      font-weight: 600;
+      border-radius: 99px;
+      padding: 1px 6px;
+      letter-spacing: 0.04em;
+    }
+    .sb-badge-warn {
+      background: ${C.warnMuted};
+      color: ${C.warn};
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      font-weight: 600;
+      border-radius: 99px;
+      padding: 1px 6px;
+      letter-spacing: 0.04em;
+    }
+    .sb-footer-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      padding: 7px 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.15s, color 0.15s;
+    }
+    .sb-footer-btn:hover { background: ${C.accentHover}; }
+    .sb-divider {
+      border: none;
+      border-top: 1px solid ${C.border};
+      margin: 6px 0;
+    }
+    .sb-scrollbar::-webkit-scrollbar { width: 3px; }
+    .sb-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .sb-scrollbar::-webkit-scrollbar-thumb { background: rgba(167,139,250,0.2); border-radius: 99px; }
+  `;
+  document.head.appendChild(style);
+};
+injectStyles();
+
+/* ─── Persistence helpers (unchanged) ───────────────────────────────────── */
 const DISMISSED_KEY = 'dismissedNewFeedback';
 const getDismissed = () => {
   try { return new Set(JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]')); }
@@ -38,7 +155,6 @@ export const markChatAsRead = (feedbackId, lastMessageId) => {
   window.dispatchEvent(new Event('adminReadChat'));
 };
 
-// ── Direct-message read helpers ──────────────────────────────────────────────
 const DM_LAST_READ_KEY = 'adminLastReadDmId';
 export const getDmLastRead = () => {
   try { return JSON.parse(localStorage.getItem(DM_LAST_READ_KEY) || '{}'); }
@@ -50,7 +166,6 @@ export const markDmAsRead = (threadId, lastMessageId) => {
   localStorage.setItem(DM_LAST_READ_KEY, JSON.stringify(map));
   window.dispatchEvent(new Event('adminReadDm'));
 };
-// ─────────────────────────────────────────────────────────────────────────────
 
 const getDueStatus = (item) => {
   if (item.status === 'Resolved' || item.status === 'Rejected') return null;
@@ -63,77 +178,111 @@ const getDueStatus = (item) => {
   return null;
 };
 
+/* ─── Sub-components ─────────────────────────────────────────────────────── */
 const SectionLabel = ({ label }) => (
-  <div
-    className="sidebar-section-label"
-    style={{
-      color: 'rgba(255,255,255,0.55)',
-      fontSize: '9px',
-      fontWeight: 700,
-      letterSpacing: '0.1em',
-      textTransform: 'uppercase',
-      padding: '6px 12px 2px',
-    }}
-  >
+  <div style={{
+    fontFamily: "'DM Mono', monospace",
+    fontSize: '9px',
+    fontWeight: 500,
+    letterSpacing: '0.13em',
+    textTransform: 'uppercase',
+    color: C.muted,
+    padding: '14px 10px 4px',
+  }}>
     {label}
   </div>
 );
 
-// ── Real Logo Component using las.png ────────────────────────────────────────
-const TempLogo = () => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '28px', marginTop: '6px' }}>
-    {/* Circular logo image */}
+const Logo = () => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
     <img
       src={lasLogo}
       alt="ClassBack Logo"
       style={{
-        width: '56px',
-        height: '56px',
+        width: '44px',
+        height: '44px',
         borderRadius: '50%',
         objectFit: 'contain',
         flexShrink: 0,
-        boxShadow: '0 4px 18px rgba(124, 58, 237, 0.55)',
-        border: '2px solid rgba(167, 139, 250, 0.4)',
-        background: 'rgba(255,255,255,0.08)',
+        border: '2px solid rgba(167,139,250,0.35)',
+        background: 'rgba(255,255,255,0.06)',
+        boxShadow: '0 2px 12px rgba(124,58,237,0.35)',
       }}
     />
-
-    {/* Wordmark */}
-    <div style={{ lineHeight: 1.2 }}>
-      <span
-        style={{
-          display: 'block',
-          fontSize: '20px',
-          fontWeight: 700,
-          background: 'linear-gradient(90deg, #a78bfa, #f472b6)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          letterSpacing: '-0.3px',
-        }}
-      >
+    <div style={{ lineHeight: 1.25 }}>
+      <span style={{
+        display: 'block',
+        fontFamily: "'DM Serif Display', serif",
+        fontSize: '19px',
+        fontWeight: 400,
+        background: 'linear-gradient(90deg, #c4b5fd, #f9a8d4)',
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        backgroundClip: 'text',
+        letterSpacing: '-0.2px',
+      }}>
         ClassBack
       </span>
-      <span
-        style={{
-          display: 'block',
-          fontSize: '10.5px',
-          color: 'rgba(255,255,255,0.35)',
-          fontWeight: 500,
-          letterSpacing: '0.03em',
-          marginTop: '3px',
-          lineHeight: 1.4,
-        }}
-      >
-        Classroom Feedback &amp; Suggestion
+      <span style={{
+        display: 'block',
+        fontFamily: "'DM Mono', monospace",
+        fontSize: '9px',
+        color: C.muted,
+        fontWeight: 400,
+        letterSpacing: '0.04em',
+        marginTop: '2px',
+      }}>
+        Feedback &amp; Suggestion
       </span>
     </div>
   </div>
 );
-// ─────────────────────────────────────────────────────────────────────────────
 
+/* ─── Toggle switch ──────────────────────────────────────────────────────── */
+const Toggle = ({ on }) => (
+  <div style={{
+    marginLeft: 'auto',
+    width: '28px',
+    height: '15px',
+    borderRadius: '99px',
+    background: on ? '#7C3AED' : 'rgba(255,255,255,0.15)',
+    position: 'relative',
+    flexShrink: 0,
+    transition: 'background 0.2s',
+  }}>
+    <div style={{
+      position: 'absolute',
+      top: '2px',
+      left: on ? '14px' : '2px',
+      width: '11px',
+      height: '11px',
+      borderRadius: '50%',
+      background: '#fff',
+      transition: 'left 0.2s',
+    }} />
+  </div>
+);
+
+/* ─── Main Sidebar ───────────────────────────────────────────────────────── */
 const Sidebar = () => {
   const { logout, user } = useAuth();
+  const location = useLocation();
+
+  // ── Bell position per page — adjust top/right independently per route ──
+  const bellPosition = {
+    '/dashboard':    { top: '38px', right: '281px' },
+    '/announcements':{ top: '38px', right: '395px'  },
+    '/messages':     { top: '24px', right: '24px'  },
+    '/feedback':     { top: '48px', right: '200px'  },
+    '/categories':   { top: '46px', right: '360px'  },
+    '/students':     { top: '42px', right: '454px'  },
+    '/reports':      { top: '46px', right: '160px'  },
+    '/settings':     { top: '40px', right: '160px'  },
+    '/staff/manage': { top: '38px', right: '149px'  },
+    '/schedules':    { top: '24px', right: '24px'  },
+  };
+  const currentBell = bellPosition[location.pathname] || { top: '24px', right: '24px' };
+
   const [newFeedbackCount, setNewFeedbackCount] = useState(0);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [dueSoonCount, setDueSoonCount] = useState(0);
@@ -142,6 +291,7 @@ const Sidebar = () => {
 
   const isAdmin = user?.role === 'admin';
   const [lightMode, setLightMode] = useState(
+    
     () => document.documentElement.classList.contains('light-mode') || document.body.classList.contains('light-mode')
   );
 
@@ -168,7 +318,6 @@ const Sidebar = () => {
     setDueSoonCount(count);
   };
 
-  // Works for both admin and staff — counts threads with unread messages from the other side
   const computeDmCount = async () => {
     try {
       const res = await messagesAPI.getThreads();
@@ -178,16 +327,11 @@ const Sidebar = () => {
       threads.forEach(thread => {
         const lastMsg = thread.lastMessage;
         if (!lastMsg) return;
-        // Unread if last message was sent by the OTHER person and we haven't read it
         const sentByMe = lastMsg.senderName === user?.name;
-        if (!sentByMe && lastRead[thread._id] !== lastMsg._id) {
-          count++;
-        }
+        if (!sentByMe && lastRead[thread._id] !== lastMsg._id) count++;
       });
       setUnreadDmCount(count);
-    } catch {
-      // silently ignore
-    }
+    } catch {}
   };
 
   const computeCounts = async () => {
@@ -324,34 +468,18 @@ const Sidebar = () => {
       <NavLink
         key={item.path}
         to={item.path}
-        className={({ isActive }) =>
-          `flex items-center gap-2 rounded-md transition-all relative ${
-            isActive
-              ? 'bg-gradient-to-r from-violet-500 to-pink-500 text-white'
-              : 'text-gray-400 hover:bg-white/10 hover:text-white'
-          }`
-        }
-        style={{ padding: '5px 10px', fontSize: '14px' }}
+        className={({ isActive }) => `sb-nav-link${isActive ? ' active' : ''}`}
       >
-        <Icon style={{ width: '16px', height: '16px', flexShrink: 0 }} />
-        <span style={{ fontWeight: 500 }}>{item.name}</span>
-        <div className="ml-auto flex items-center gap-1">
+        <Icon className="sb-icon" />
+        <span>{item.name}</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px' }}>
           {item.overdueBadge > 0 && (
-            <span
-              className="bg-orange-500 text-white font-bold rounded-full text-center"
-              style={{ fontSize: '9px', padding: '1px 5px', minWidth: '16px' }}
-              title={`${item.overdueBadge} overdue or due today`}
-            >
+            <span className="sb-badge-warn" title={`${item.overdueBadge} overdue or due today`}>
               {item.overdueBadge}⚠
             </span>
           )}
           {item.badge > 0 && (
-            <span
-              className="bg-red-500 text-white font-bold rounded-full text-center"
-              style={{ fontSize: '9px', padding: '1px 5px', minWidth: '16px' }}
-            >
-              {item.badge}
-            </span>
+            <span className="sb-badge-red">{item.badge}</span>
           )}
         </div>
       </NavLink>
@@ -360,92 +488,120 @@ const Sidebar = () => {
 
   return (
     <div
-      className="w-64 backdrop-blur-lg flex flex-col h-screen"
       style={{
-        isolation: 'isolate',
-        background: lightMode ? 'rgba(100, 90, 130, 0.25)' : 'rgba(255,255,255,0.05)',
-        borderRight: lightMode ? '1px solid rgba(100, 90, 130, 0.25)' : '1px solid rgba(255,255,255,0.10)',
+        width: '240px',
+        flexShrink: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        background: 'linear-gradient(180deg, #0f0a1e 0%, #130d28 40%, #1e1040 65%, #3a1260 82%, #5a1458 92%, #7a1560 100%)',
+        borderRight: '1px solid rgba(167,139,250,0.12)',
+        fontFamily: "'DM Sans', sans-serif",
       }}
     >
-      {/* Header */}
-      <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        {/* ── REAL LOGO (las.png) ── */}
-        <TempLogo />
-        {/* ───────────────────────── */}
+      {/* ── Header ── */}
+      <div style={{
+        padding: '20px 16px 16px',
+        borderBottom: '1px solid rgba(167,139,250,0.12)',
+      }}>
+        <Logo />
+        <div style={{ borderTop: '1px solid rgba(167,139,250,0.12)', margin: '14px 0 10px' }} />
 
-        <h1
-          className="font-bold bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent"
-          style={{ fontSize: '18px', lineHeight: 1.2, marginTop: '14px' }}
-        >
-          {isAdmin ? 'Admin Panel' : 'Staff Panel'}
-        </h1>
-        <p className="text-gray-400 flex items-center gap-2" style={{ fontSize: '11px', marginTop: '4px' }}>
-          {user?.name}
-          {user?.role && (
-            <span
-              className="bg-violet-500/30 text-violet-300 rounded-full"
-              style={{ fontSize: '9px', padding: '1px 7px' }}
-            >
-              {user?.role}
-            </span>
-          )}
-        </p>
+        {/* Panel title + user (bell removed from here) */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: '9px',
+              letterSpacing: '0.13em',
+              textTransform: 'uppercase',
+              color: C.muted,
+              marginBottom: '4px',
+            }}>
+              {isAdmin ? 'Admin Panel' : 'Staff Panel'}
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: '13px',
+                fontWeight: 600,
+                color: C.text,
+              }}>
+                {user?.name}
+              </span>
+              {user?.role && (
+                <span style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: '9px',
+                  color: '#c4b5fd',
+                  background: 'rgba(124,58,237,0.25)',
+                  border: '1px solid rgba(167,139,250,0.30)',
+                  borderRadius: '3px',
+                  padding: '1px 6px',
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                }}>
+                  {user.role}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Nav groups */}
-      <nav className="flex-1 overflow-y-auto" style={{ padding: '2px 8px' }}>
+      {/* ── Navigation ── */}
+      <nav className="sb-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '4px 8px 8px' }}>
         {groups.map((group) => (
-          <div key={group.label} style={{ marginBottom: '0px' }}>
+          <div key={group.label}>
             <SectionLabel label={group.label} />
             {group.items.map((item) => renderItem(item))}
           </div>
         ))}
       </nav>
 
-      {/* Footer */}
-      <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+      {/* ── Footer ── */}
+      <div style={{
+        padding: '8px',
+        borderTop: '1px solid rgba(167,139,250,0.12)',
+      }}>
         {!isAdmin && (
           <>
             <button
               onClick={toggleTheme}
-              className="flex items-center gap-2 rounded-md w-full transition-all hover:bg-white/10"
-              style={{ color: 'rgba(255,255,255,0.85)', padding: '6px 10px', fontSize: '13px' }}
+              className="sb-footer-btn"
+              style={{ color: C.subtle }}
             >
               {lightMode
-                ? <Sun style={{ width: '14px', height: '14px' }} />
-                : <Moon style={{ width: '14px', height: '14px' }} />
+                ? <Sun style={{ width: '14px', height: '14px', flexShrink: 0 }} />
+                : <Moon style={{ width: '14px', height: '14px', flexShrink: 0 }} />
               }
-              <span style={{ fontWeight: 500 }}>{lightMode ? 'Light Mode' : 'Dark Mode'}</span>
-              <div
-                className="ml-auto rounded-full relative transition-all"
-                style={{
-                  width: '28px', height: '15px',
-                  background: lightMode ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  flexShrink: 0,
-                }}
-              >
-                <div
-                  className="absolute rounded-full bg-white shadow transition-all"
-                  style={{
-                    top: '1.5px', width: '11px', height: '11px',
-                    left: lightMode ? '14px' : '2px',
-                  }}
-                />
-              </div>
+              <span>{lightMode ? 'Light Mode' : 'Dark Mode'}</span>
+              <Toggle on={lightMode} />
             </button>
-            <div className="border-t border-white/10 mx-1" style={{ margin: '4px 4px' }} />
+            <hr className="sb-divider" />
           </>
         )}
         <button
           onClick={logout}
-          className="flex items-center gap-2 rounded-md text-red-400 hover:bg-red-500/20 transition-all w-full"
-          style={{ padding: '6px 10px', fontSize: '13px' }}
+          className="sb-footer-btn"
+          style={{ color: C.danger }}
         >
-          <LogOut style={{ width: '14px', height: '14px' }} />
-          <span style={{ fontWeight: 500 }}>Logout</span>
+          <LogOut style={{ width: '14px', height: '14px', flexShrink: 0 }} />
+          <span>Logout</span>
         </button>
       </div>
+
+      {/* ── Fixed Notification Bell (top-right, visible on all pages) ── */}
+      <div style={{
+        position: 'fixed',
+        top: currentBell.top,
+        right: currentBell.right,
+        zIndex: 9999,
+        transition: 'right 0.2s ease, top 0.2s ease',
+      }}>
+        <NotificationBell isLightMode={lightMode} />
+      </div>
+
     </div>
   );
 };

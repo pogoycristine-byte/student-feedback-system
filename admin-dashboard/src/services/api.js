@@ -45,8 +45,6 @@ export const feedbackAPI = {
   getById: (id) => api.get(`/feedback/${id}`),
   updateStatus: (id, data) => api.put(`/feedback/${id}/status`, data),
   delete: (id) => api.delete(`/feedback/${id}`),
-
-  // Chat functions
   sendMessage: (id, message) => api.post(`/feedback/${id}/message`, { message }),
   getMessages: (id) => api.get(`/feedback/${id}/messages`),
 };
@@ -70,7 +68,6 @@ export const analyticsAPI = {
   getTrends: (period) => api.get('/analytics/trends', { params: { period } }),
 };
 
-// ── Announcements API ──
 export const announcementAPI = {
   getAll:  ()         => api.get('/announcements'),
   create:  (data)     => api.post('/announcements', data),
@@ -78,12 +75,20 @@ export const announcementAPI = {
   remove:  (id)       => api.delete(`/announcements/${id}`),
 };
 
-// ── Direct Messages API ──
 export const messagesAPI = {
   getThreads:   ()                  => api.get('/messages/threads'),
   getMessages:  (threadId)          => api.get(`/messages/${threadId}`),
   send:         (threadId, message) => api.post(`/messages/${threadId}`, { message }),
   getStaffList: ()                  => api.get('/messages/staff'),
+};
+
+// ✅ NEW
+export const notificationsAPI = {
+  getAll:      ()    => api.get('/notifications'),
+  markRead:    (id)  => api.put(`/notifications/${id}/read`),
+  markAllRead: ()    => api.put('/notifications/read-all'),
+  deleteOne:   (id)  => api.delete(`/notifications/${id}`),
+  clearAll:    ()    => api.delete('/notifications/clear-all'),
 };
 
 export default api;

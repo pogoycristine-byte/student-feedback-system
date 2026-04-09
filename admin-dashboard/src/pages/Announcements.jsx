@@ -104,10 +104,14 @@ const Announcements = () => {
   const hiddenCount = announcements.filter(a => !a.isActive).length;
 
   // ── Text color helpers ──
-  const titleColor   = isLightMode ? '#111827' : undefined;
-  const messageColor = isLightMode ? '#1f2937' : undefined;
-  const metaColor    = isLightMode ? '#374151' : undefined;
-  const iconColor    = isLightMode ? '#5b21b6' : undefined;
+  const titleColor   = isLightMode ? '#111827' : '#ffffff';       // ← white in dark mode
+  const messageColor = isLightMode ? '#1f2937' : '#e5e7eb';       // ← light gray in dark mode
+  const metaColor    = isLightMode ? '#374151' : '#9ca3af';       // ← muted in dark mode
+  const iconColor    = isLightMode ? '#5b21b6' : '#a78bfa';       // ← violet in dark mode
+
+  // ── Card styles ──
+  const cardBg     = isLightMode ? undefined : 'rgba(255,255,255,0.06)';      // ← brighter card in dark
+  const cardBorder = isLightMode ? undefined : 'rgba(255,255,255,0.12)';      // ← visible border in dark
 
   return (
     <div className="p-6 space-y-6">
@@ -150,18 +154,18 @@ const Announcements = () => {
           className="rounded-xl border p-5 space-y-3"
           style={{
             borderColor: 'rgba(109,40,217,0.3)',
-            background: isLightMode ? 'rgba(237,233,254,0.5)' : 'rgba(109,40,217,0.05)',
+            background: isLightMode ? 'rgba(237,233,254,0.5)' : 'rgba(109,40,217,0.08)',
           }}
         >
-          <p className="font-semibold text-sm" style={{ color: isLightMode ? '#111827' : undefined }}>New Announcement</p>
+          <p className="font-semibold text-sm" style={{ color: titleColor }}>New Announcement</p>
           <input
             type="text"
             placeholder="Title (e.g. No Classes on Friday)"
             className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border"
             style={{
-              background: isLightMode ? 'rgba(255,255,255,0.9)' : undefined,
-              borderColor: isLightMode ? 'rgba(196,181,253,0.6)' : undefined,
-              color: isLightMode ? '#111827' : undefined,
+              background: isLightMode ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.07)',
+              borderColor: isLightMode ? 'rgba(196,181,253,0.6)' : 'rgba(255,255,255,0.15)',
+              color: isLightMode ? '#111827' : '#ffffff',
             }}
             value={newForm.title}
             onChange={(e) => setNewForm({ ...newForm, title: e.target.value })}
@@ -171,9 +175,9 @@ const Announcements = () => {
             rows={3}
             className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border resize-none"
             style={{
-              background: isLightMode ? 'rgba(255,255,255,0.9)' : undefined,
-              borderColor: isLightMode ? 'rgba(196,181,253,0.6)' : undefined,
-              color: isLightMode ? '#111827' : undefined,
+              background: isLightMode ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.07)',
+              borderColor: isLightMode ? 'rgba(196,181,253,0.6)' : 'rgba(255,255,255,0.15)',
+              color: isLightMode ? '#111827' : '#ffffff',
             }}
             value={newForm.message}
             onChange={(e) => setNewForm({ ...newForm, message: e.target.value })}
@@ -189,7 +193,7 @@ const Announcements = () => {
             <button
               onClick={() => { setShowAddForm(false); setNewForm({ title: '', message: '' }); }}
               className="px-4 py-2 text-sm rounded-lg hover:bg-white/10"
-              style={{ color: isLightMode ? '#374151' : undefined }}
+              style={{ color: isLightMode ? '#374151' : '#d1d5db' }}
             >
               Cancel
             </button>
@@ -213,9 +217,12 @@ const Announcements = () => {
           {visibleAnnouncements.map((a) => (
             <div
               key={a._id}
-              className="bg-card rounded-xl border p-5"
+              className="rounded-xl border p-5"
               style={{
-                borderColor: a.isActive ? 'rgba(109,40,217,0.25)' : 'var(--card-border)',
+                background: isLightMode ? 'var(--card-bg)' : cardBg,
+                borderColor: a.isActive
+                  ? 'rgba(109,40,217,0.35)'
+                  : isLightMode ? 'var(--card-border)' : cardBorder,
                 opacity: a.isActive ? 1 : 0.6,
               }}
             >
@@ -225,9 +232,9 @@ const Announcements = () => {
                     type="text"
                     className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border"
                     style={{
-                      background: isLightMode ? 'rgba(255,255,255,0.9)' : undefined,
-                      borderColor: isLightMode ? 'rgba(196,181,253,0.6)' : undefined,
-                      color: isLightMode ? '#111827' : undefined,
+                      background: isLightMode ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.07)',
+                      borderColor: isLightMode ? 'rgba(196,181,253,0.6)' : 'rgba(255,255,255,0.15)',
+                      color: isLightMode ? '#111827' : '#ffffff',
                     }}
                     value={editForm.title}
                     onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
@@ -236,9 +243,9 @@ const Announcements = () => {
                     rows={3}
                     className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border resize-none"
                     style={{
-                      background: isLightMode ? 'rgba(255,255,255,0.9)' : undefined,
-                      borderColor: isLightMode ? 'rgba(196,181,253,0.6)' : undefined,
-                      color: isLightMode ? '#111827' : undefined,
+                      background: isLightMode ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.07)',
+                      borderColor: isLightMode ? 'rgba(196,181,253,0.6)' : 'rgba(255,255,255,0.15)',
+                      color: isLightMode ? '#111827' : '#ffffff',
                     }}
                     value={editForm.message}
                     onChange={(e) => setEditForm({ ...editForm, message: e.target.value })}
@@ -250,7 +257,7 @@ const Announcements = () => {
                     </button>
                     <button onClick={() => setEditingId(null)}
                       className="px-3 py-1.5 text-xs rounded-lg hover:bg-white/10"
-                      style={{ color: isLightMode ? '#374151' : undefined }}>
+                      style={{ color: isLightMode ? '#374151' : '#d1d5db' }}>
                       Cancel
                     </button>
                   </div>
@@ -261,34 +268,34 @@ const Announcements = () => {
                     {/* Icon */}
                     <div
                       className="p-2 rounded-lg shrink-0 mt-0.5"
-                      style={{ background: a.isActive ? 'rgba(109,40,217,0.15)' : 'rgba(107,114,128,0.1)' }}
+                      style={{ background: a.isActive ? 'rgba(109,40,217,0.18)' : 'rgba(107,114,128,0.15)' }}
                     >
                       <Megaphone
                         size={16}
-                        style={{ color: a.isActive ? (iconColor || '#a78bfa') : (isLightMode ? '#6b7280' : '#6b7280') }}
+                        style={{ color: a.isActive ? iconColor : (isLightMode ? '#6b7280' : '#9ca3af') }}
                       />
                     </div>
 
                     <div className="flex-1 min-w-0">
                       {/* Title + Live/Hidden badge */}
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <p className="font-bold text-sm" style={{ color: titleColor || undefined }}>
+                        <p className="font-bold text-sm" style={{ color: titleColor }}>
                           {a.title}
                         </p>
                         {a.isActive ? (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-500/15 text-emerald-600 border border-emerald-500/30">Live</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Live</span>
                         ) : (
                           <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-gray-500/15 border border-gray-500/30" style={{ color: isLightMode ? '#374151' : '#9ca3af' }}>Hidden</span>
                         )}
                       </div>
 
                       {/* Message */}
-                      <p className="text-sm leading-relaxed" style={{ color: messageColor || undefined }}>
+                      <p className="text-sm leading-relaxed" style={{ color: messageColor }}>
                         {a.message}
                       </p>
 
                       {/* Posted by / date */}
-                      <p className="text-xs mt-2 font-medium" style={{ color: metaColor || undefined }}>
+                      <p className="text-xs mt-2 font-medium" style={{ color: metaColor }}>
                         Posted by {a.createdBy?.name} · {new Date(a.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </p>
                     </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Settings, Sun, Moon, UserPlus, X, Lock, User, Bell, Info, Mail, Database, Shield, FileText, Plus, Trash2, Pencil, Check, Copy, RefreshCw } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -34,7 +35,8 @@ const SystemSettings = () => {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [staffStep,         setStaffStep]         = useState(1);
   const [staffFormData,     setStaffFormData]     = useState({ name: '', email: '', password: '', studentId: '' });
-  const [copiedField,       setCopiedField]       = useState(null); // 'id' | 'password'
+  const [copiedField,       setCopiedField]       = useState(null);
+  const [mounted,           setMounted]           = useState(false); // ← added
 
   const [passwordFormData, setPasswordFormData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [notificationSettings, setNotificationSettings] = useState({
@@ -44,6 +46,11 @@ const SystemSettings = () => {
   });
   const [systemStats,  setSystemStats]  = useState({ totalUsers: '--', totalFeedback: '--', totalCategories: '--' });
   const [statsLoading, setStatsLoading] = useState(true);
+
+  // ← added
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     fetchSystemStats();
@@ -383,7 +390,7 @@ const SystemSettings = () => {
       </div>
 
       {/* ===== CHANGE PASSWORD MODAL ===== */}
-      {showPasswordModal && (
+      {mounted && showPasswordModal && createPortal(
         <div className="bg-modal-overlay backdrop-blur-sm" style={overlayStyle}>
           <div className="bg-modal rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
@@ -424,11 +431,12 @@ const SystemSettings = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ===== STAFF CREATION MODAL ===== */}
-      {showStaffModal && (
+      {mounted && showStaffModal && createPortal(
         <div className="bg-modal-overlay backdrop-blur-sm" style={overlayStyle}>
           <div className="bg-modal rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
 
@@ -538,7 +546,8 @@ const SystemSettings = () => {
               </form>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>

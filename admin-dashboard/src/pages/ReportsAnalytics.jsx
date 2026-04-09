@@ -294,7 +294,7 @@ const ReportsAnalytics = () => {
       {/* Header */}
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-violet-400 mb-1">Overview</p>
+         
           <h1 className="text-3xl font-bold text-white">Reports & Analytics</h1>
           <p className="text-gray-400 text-sm mt-1">Key metrics and feedback breakdown at a glance.</p>
         </div>

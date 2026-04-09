@@ -124,6 +124,53 @@ const IconStudents = () => (
 );
 
 /* ─────────────────────────────────────────
+   STUDENT AVATAR (profile picture with fallback)
+───────────────────────────────────────── */
+
+const StudentAvatar = ({ src, name, size = 28 }) => {
+  const [imgError, setImgError] = useState(false);
+  const initials = name
+    ? name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+    : '?';
+  const colors = [
+    ['#7c3aed', '#4c1d95'], ['#db2777', '#831843'], ['#0369a1', '#0c4a6e'],
+    ['#059669', '#064e3b'], ['#d97706', '#78350f'], ['#dc2626', '#7f1d1d'],
+  ];
+  const colorPair = colors[(name?.charCodeAt(0) || 0) % colors.length];
+
+  if (src && !imgError) {
+    return (
+      <img
+        src={src}
+        alt={name}
+        onError={() => setImgError(true)}
+        style={{
+          width: size, height: size,
+          borderRadius: '50%',
+          objectFit: 'cover',
+          border: '2px solid rgba(139,92,246,0.4)',
+          flexShrink: 0,
+        }}
+      />
+    );
+  }
+  return (
+    <div style={{
+      width: size, height: size,
+      borderRadius: '50%',
+      background: `linear-gradient(135deg, ${colorPair[0]}, ${colorPair[1]})`,
+      border: '2px solid rgba(139,92,246,0.4)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+      fontSize: size * 0.35, fontWeight: 700, color: '#fff',
+      letterSpacing: '0.5px',
+    }}>
+      {initials}
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────
    DASHBOARD COMPONENT
 ───────────────────────────────────────── */
 
@@ -260,32 +307,32 @@ const Dashboard = () => {
     <div className="p-6 space-y-6">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-1">Dashboard Overview</h1>
-          <p className="text-gray-400 text-sm">Welcome back! Here's what's happening today.</p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="bg-white/10 backdrop-blur-lg rounded-xl px-4 py-2.5 border border-white/20 flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg" style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
-              <TrendingUp className="w-3.5 h-3.5 text-white" />
-            </div>
-            <div>
-              <p className="text-gray-400 text-xs leading-tight">Resolution Rate</p>
-              <p className="text-white font-bold text-sm">{resolutionRate}%</p>
-            </div>
-          </div>
-          <div className="bg-white/10 backdrop-blur-lg rounded-xl px-4 py-2.5 border border-white/20 flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg" style={{ background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)' }}>
-              <Clock className="w-3.5 h-3.5 text-white" />
-            </div>
-            <div>
-              <p className="text-gray-400 text-xs leading-tight">Avg Resolution</p>
-              <p className="text-white font-bold text-sm">{averageResolutionTime} days</p>
-            </div>
-          </div>
-        </div>
-      </div>
+<div className="flex items-center justify-between gap-4">
+  <div>
+    <h1 className="text-3xl font-bold text-white mb-1">Dashboard Overview</h1>
+    <p className="text-gray-400 text-sm">Welcome back! Here's what's happening today.</p>
+  </div>
+  <div className="flex items-center gap-2 shrink-0">
+  <div className="bg-white/10 backdrop-blur-lg rounded-lg px-2.5 py-1.5 border border-white/20 flex items-center gap-1.5">
+    <div className="p-1 rounded-md" style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
+      <TrendingUp className="w-3 h-3 text-white" />
+    </div>
+    <div>
+      <p className="text-gray-400 leading-tight" style={{ fontSize: '0.6rem' }}>Resolution Rate</p>
+      <p className="text-white font-bold" style={{ fontSize: '0.72rem' }}>{resolutionRate}%</p>
+    </div>
+  </div>
+  <div className="bg-white/10 backdrop-blur-lg rounded-lg px-2.5 py-1.5 border border-white/20 flex items-center gap-1.5">
+    <div className="p-1 rounded-md" style={{ background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)' }}>
+      <Clock className="w-3 h-3 text-white" />
+    </div>
+    <div>
+      <p className="text-gray-400 leading-tight" style={{ fontSize: '0.6rem' }}>Avg Resolution</p>
+      <p className="text-white font-bold" style={{ fontSize: '0.72rem' }}>{averageResolutionTime} days</p>
+    </div>
+  </div>
+</div>
+</div>
 
       {/* ── Stat Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -452,11 +499,13 @@ const Dashboard = () => {
               {displayedFeedback.map((item) => (
                 <tr key={item._id} className="hover:bg-white/5">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                    {/* ── CHANGED: replaced static initial div with StudentAvatar ── */}
                     <div className="flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                        style={{ background: 'linear-gradient(135deg,#6D28D9,#BE185D)' }}>
-                        {item.student?.name?.[0]?.toUpperCase() || '?'}
-                      </div>
+                      <StudentAvatar
+                        src={item.student?.profilePicture}
+                        name={item.student?.name}
+                        size={28}
+                      />
                       <div>
                         <div className="font-medium">{item.student?.name}</div>
                         <div className="text-gray-400 text-xs">{item.student?.studentId}</div>

@@ -10,6 +10,7 @@ import {
 import { messagesAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { markDmAsRead } from '../components/Sidebar';
+import { useLocation } from 'react-router-dom'; // ← added
 
 const fmt = (iso) => {
   if (!iso) return '';
@@ -23,6 +24,7 @@ const fmt = (iso) => {
 const MessagesPage = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const location = useLocation(); // ← added
 
   const [staffList, setStaffList] = useState([]);
   const [threads, setThreads] = useState([]);
@@ -123,6 +125,19 @@ const MessagesPage = () => {
     loadMessages(item.id, item.isNewConvo);
     setMobileShowChat(true);
   };
+
+  // ← added: auto-select thread when navigated from a notification
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const threadId = params.get('thread');
+    if (!threadId || loading) return;
+
+    const match = sidebarItems.find((s) => s.id === threadId);
+    if (match) {
+      selectThread(match);
+      window.history.replaceState({}, '', '/messages');
+    }
+  }, [location.search, loading, sidebarItems.length]);
 
   useEffect(() => {
     if (pollRef.current) clearInterval(pollRef.current);

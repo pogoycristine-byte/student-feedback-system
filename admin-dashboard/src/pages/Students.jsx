@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { userAPI } from '../services/api';
 import { Search, Eye, UserCheck, UserX, Trash2, X, Users, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 const TABS = ['Students', 'Staff', 'Admin'];
 
@@ -68,6 +69,7 @@ const Students = () => {
   const [activeTab, setActiveTab] = useState('Students');
   const [selectedUser, setSelectedUser] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [mounted, setMounted] = useState(false); // ← added
 
   const [onlineFilter, setOnlineFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -86,6 +88,11 @@ const Students = () => {
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
+  }, []);
+
+  // ← added
+  useEffect(() => {
+    setMounted(true);
   }, []);
 
   useEffect(() => {
@@ -240,7 +247,7 @@ const Students = () => {
   }
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="px-6 pb-6 pt-0 space-y-5" style={{ marginTop: '1px' }}>
       <style>{`.users-search-input::placeholder { color: #1e1b4b !important; opacity: 0.5 !important; }`}</style>
 
       {/* ── Header ── */}
@@ -539,7 +546,7 @@ const Students = () => {
       )}
 
       {/* ── Detail Modal ── */}
-      {showModal && selectedUser && (
+      {mounted && showModal && selectedUser && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div
             className="rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
@@ -644,7 +651,8 @@ const Students = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

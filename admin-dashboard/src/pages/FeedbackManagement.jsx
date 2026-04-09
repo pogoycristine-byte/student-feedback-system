@@ -3,16 +3,18 @@ import { feedbackAPI, categoryAPI } from '../services/api';
 import { Search, Eye, Trash2, MessageSquare, Calendar, Filter, X, ChevronDown, Star, FileText } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { createPortal } from 'react-dom';
 
 const DISMISSED_KEY = 'dismissedNewFeedback';
-const getDismissed = () => {
-  try { return new Set(JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]')); }
+const getDismissedKey = (userId) => `${DISMISSED_KEY}_${userId}`;
+const getDismissed = (userId) => {
+  try { return new Set(JSON.parse(localStorage.getItem(getDismissedKey(userId)) || '[]')); }
   catch { return new Set(); }
 };
-const addDismissed = (id) => {
-  const set = getDismissed();
+const addDismissed = (id, userId) => {
+  const set = getDismissed(userId);
   set.add(id);
-  localStorage.setItem(DISMISSED_KEY, JSON.stringify([...set]));
+  localStorage.setItem(getDismissedKey(userId), JSON.stringify([...set]));
 };
 
 const LAST_READ_KEY = 'adminLastReadMsgId';
@@ -181,17 +183,30 @@ const FeedbackManagement = () => {
   const [showModal, setShowModal] = useState(false);
   const [adminComment, setAdminComment] = useState('');
   const [newStatus, setNewStatus] = useState('');
-  const [dismissedNew, setDismissedNew] = useState(getDismissed);
+  const [dismissedNew, setDismissedNew] = useState(() => getDismissed());
   const [unreadChats, setUnreadChats] = useState(new Map());
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [templates, setTemplates] = useState([]);
+  const [mounted, setMounted] = useState(false); // ← added
 
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+
+  // ← added
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Re-initialize dismissedNew once user is available
+  useEffect(() => {
+    if (user?._id || user?.id) {
+      setDismissedNew(getDismissed(user?._id || user?.id));
+    }
+  }, [user?._id, user?.id]);
 
   useEffect(() => {
     setTemplates(getTemplates());
@@ -291,9 +306,11 @@ const FeedbackManagement = () => {
   };
 
   const handleViewDetails = async (item) => {
-    addDismissed(item._id);
-    setDismissedNew(getDismissed());
+    const userId = user?._id || user?.id;
+    addDismissed(item._id, userId);
+    setDismissedNew(getDismissed(userId));
     window.dispatchEvent(new Event('feedbackDismissed'));
+    window.dispatchEvent(new CustomEvent('feedbackModalOpen', { detail: { open: true } }));
     setSelectedFeedback(item);
     setNewStatus(item.status);
     setAdminComment(item.adminResponse?.comment || '');
@@ -321,7 +338,8 @@ const FeedbackManagement = () => {
       await feedbackAPI.updateStatus(selectedFeedback._id, { status: newStatus, comment: adminComment });
       if (adminComment.trim()) await feedbackAPI.sendMessage(selectedFeedback._id, adminComment.trim());
       setShowModal(false);
-      fetchFeedback();
+window.dispatchEvent(new CustomEvent('feedbackModalOpen', { detail: { open: false } }));
+fetchFeedback();
       alert('Feedback updated successfully!');
     } catch (error) {
       alert(`Failed to update feedback: ${error.response?.data?.message || error.message}`);
@@ -438,7 +456,7 @@ const FeedbackManagement = () => {
   }
 
   return (
-    <div className="p-6 space-y-5">
+   <div className="p-6 space-y-5" style={{ marginTop: '-1.2rem' }}>
       <style>{`.feedback-search-input::placeholder { color: #1e1b4b !important; opacity: 0.5 !important; }`}</style>
 
       {/* ── Header ── */}
@@ -689,23 +707,18 @@ const FeedbackManagement = () => {
                 const dueStatus = getDueStatus(item);
                 const dueBadge = dueStatus ? DUE_BADGE[dueStatus] : null;
                 const isOthers = item.category?.name?.toLowerCase().trim() === 'others' || item.category?.name?.toLowerCase().trim() === 'other';
-                // For anonymous: show a masked avatar; for real students: show their profile picture
                 const isAnonymousHidden = item.isAnonymous && !isAdmin;
                 return (
                   <tr key={item._id} className="group transition-all hover:bg-white/[0.04]" style={{ borderBottom: '1px solid rgba(0,0,0,0.25)' }}>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2.5">
-                        {/* ── NEW: red "new" dot ── */}
                         {showNew && (
                           <div className="relative shrink-0">
                             <div className="w-2 h-2 bg-red-500 rounded-full" />
                             <div className="absolute inset-0 w-2 h-2 bg-red-500 rounded-full animate-ping opacity-75" />
                           </div>
                         )}
-
-                        {/* ── NEW: profile picture / anonymous avatar ── */}
                         {isAnonymousHidden ? (
-                          // Masked silhouette for anonymous (non-admin view)
                           <div style={{
                             width: 34, height: 34, borderRadius: '50%',
                             background: 'rgba(255,255,255,0.08)',
@@ -722,8 +735,6 @@ const FeedbackManagement = () => {
                             size={34}
                           />
                         )}
-
-                        {/* ── name + studentId ── */}
                         <div>
                           {isAnonymousHidden ? (
                             <div className="flex items-center gap-1.5">
@@ -823,7 +834,7 @@ const FeedbackManagement = () => {
       </div>
 
       {/* ── Modal ── */}
-      {showModal && selectedFeedback && (
+      {mounted && showModal && selectedFeedback && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="feedback-modal rounded-2xl w-full flex flex-col"
             style={{
@@ -834,7 +845,6 @@ const FeedbackManagement = () => {
             }}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 shrink-0">
               <div className="flex items-center gap-3">
-                {/* ── Modal header: profile picture next to title ── */}
                 {selectedFeedback.isAnonymous && !isAdmin ? (
                   <div style={{
                     width: 38, height: 38, borderRadius: '50%',
@@ -860,7 +870,7 @@ const FeedbackManagement = () => {
                 {(() => { const ds = getDueStatus(selectedFeedback); const db = ds ? DUE_BADGE[ds] : null;
                   return db ? <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${db.cls}`}>{db.label}</span> : null;
                 })()}
-                <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all">
+              <button onClick={() => { setShowModal(false); window.dispatchEvent(new CustomEvent('feedbackModalOpen', { detail: { open: false } })); }} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -978,8 +988,8 @@ const FeedbackManagement = () => {
                     style={{ background: 'linear-gradient(135deg, #7c3aed, #db2777)', boxShadow: '0 4px 20px rgba(124,58,237,0.4)' }}>
                     Update Feedback
                   </button>
-                  <button onClick={() => setShowModal(false)}
-                    className="w-full py-2 rounded-lg font-medium text-sm transition-all hover:bg-white/10"
+                 <button onClick={() => { setShowModal(false); window.dispatchEvent(new CustomEvent('feedbackModalOpen', { detail: { open: false } })); }}
+    className="w-full py-2 rounded-lg font-medium text-sm transition-all hover:bg-white/10"
                     style={{ background: isLightMode ? 'rgba(237,233,254,0.6)' : 'rgba(255,255,255,0.06)', border: isLightMode ? '1px solid rgba(196,181,253,0.4)' : '1px solid rgba(255,255,255,0.12)', color: isLightMode ? '#4c1d95' : '#d1d5db' }}>
                     Close
                   </button>
@@ -987,7 +997,8 @@ const FeedbackManagement = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

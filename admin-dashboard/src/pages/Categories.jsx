@@ -3,6 +3,7 @@ import { categoryAPI, feedbackAPI } from '../services/api';
 import { Search, Trash2, MessageSquare, X, Tag, ChevronRight, LayoutGrid, Filter, ChevronDown, Plus, Edit2, Star, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { createPortal } from 'react-dom';
 
 const STATUS_STYLES = {
   Pending:        { pill: 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40', dot: 'bg-yellow-400' },
@@ -46,6 +47,10 @@ const DUE_BADGE = {
   'due-soon':  { label: '🕐 Due Soon',  cls: 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30' },
 };
 
+const dispatchModalOpen = (open) => {
+  window.dispatchEvent(new CustomEvent('feedbackModalOpen', { detail: { open } }));
+};
+
 const CategoryManagement = () => {
   const [categories, setCategories] = useState([]);
   const [allCategoryFeedbackMap, setAllCategoryFeedbackMap] = useState({});
@@ -70,6 +75,8 @@ const CategoryManagement = () => {
   const [adminComment, setAdminComment] = useState('');
   const [newStatus, setNewStatus] = useState('');
 
+  const [mounted, setMounted] = useState(false);
+
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
@@ -84,6 +91,10 @@ const CategoryManagement = () => {
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    setMounted(true);
   }, []);
 
   const dropdownPanelStyle = isLightMode
@@ -179,12 +190,14 @@ const CategoryManagement = () => {
       setCategoryFormData({ name: '', description: '', icon: '📝' });
     }
     setShowCategoryModal(true);
+    dispatchModalOpen(true);
   };
 
   const handleCloseCategoryModal = () => {
     setShowCategoryModal(false);
     setEditingCategory(null);
     setCategoryFormData({ name: '', description: '', icon: '📝' });
+    dispatchModalOpen(false);
   };
 
   const handleCategorySubmit = async (e) => {
@@ -231,6 +244,7 @@ const CategoryManagement = () => {
     setNewStatus(item.status);
     setAdminComment(item.adminResponse?.comment || '');
     setShowDetailModal(true);
+    dispatchModalOpen(true);
   };
 
   const handleUpdateStatus = async () => {
@@ -238,6 +252,7 @@ const CategoryManagement = () => {
       await feedbackAPI.updateStatus(selectedFeedback._id, { status: newStatus, comment: adminComment });
       if (adminComment.trim()) await feedbackAPI.sendMessage(selectedFeedback._id, adminComment.trim());
       setShowDetailModal(false);
+      dispatchModalOpen(false);
       if (selectedCategory) {
         fetchCategoryFeedback(selectedCategory);
       } else if (showGlobalPanel) {
@@ -805,53 +820,89 @@ const CategoryManagement = () => {
         </div>
       </div>
 
-      {/* Add/Edit Category Modal */}
-      {showCategoryModal && (
-        <div className="fixed inset-0 bg-modal-overlay backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-modal rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+      {/* Add/Edit Category Modal — now using createPortal */}
+      {mounted && showCategoryModal && createPortal(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-modal rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl"
+            style={{
+              background: isLightMode ? 'rgba(245,243,255,0.97)' : 'linear-gradient(145deg, #1a1025, #0f0a1a)',
+              border: isLightMode ? '1px solid rgba(196,181,253,0.5)' : '1px solid rgba(255,255,255,0.12)',
+              boxShadow: isLightMode ? '0 25px 60px rgba(109,40,217,0.15)' : '0 25px 60px rgba(0,0,0,0.6)',
+            }}>
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-app-primary">{editingCategory ? 'Edit Category' : 'Add Category'}</h2>
-              <button onClick={handleCloseCategoryModal} className="text-app-secondary hover:text-app-primary"><X size={24} /></button>
+              <h2 className="text-2xl font-bold" style={{ color: isLightMode ? '#1e1b4b' : '#ffffff' }}>
+                {editingCategory ? 'Edit Category' : 'Add Category'}
+              </h2>
+              <button onClick={handleCloseCategoryModal} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all">
+                <X size={20} />
+              </button>
             </div>
             <form onSubmit={handleCategorySubmit} className="space-y-4">
               <div>
-                <label className="block text-app-secondary mb-2">Category Name *</label>
+                <label className="block text-sm font-medium mb-2" style={{ color: isLightMode ? '#4c1d95' : '#9ca3af' }}>Category Name *</label>
                 <input type="text" required placeholder="e.g. Teaching Method, Facilities"
-                  className="w-full px-4 py-2 bg-input border rounded-lg placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  value={categoryFormData.name} onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })} />
+                  className="w-full px-4 py-2 rounded-lg text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  style={{
+                    background: isLightMode ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.06)',
+                    border: isLightMode ? '1px solid rgba(196,181,253,0.4)' : '1px solid rgba(255,255,255,0.12)',
+                    color: isLightMode ? '#1e1b4b' : '#ffffff',
+                  }}
+                  value={categoryFormData.name}
+                  onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })} />
               </div>
               <div>
-                <label className="block text-app-secondary mb-2">Description</label>
+                <label className="block text-sm font-medium mb-2" style={{ color: isLightMode ? '#4c1d95' : '#9ca3af' }}>Description</label>
                 <textarea placeholder="Brief description of this category"
-                  className="w-full px-4 py-2 bg-input border rounded-lg placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  rows="3" value={categoryFormData.description} onChange={(e) => setCategoryFormData({ ...categoryFormData, description: e.target.value })} />
+                  className="w-full px-4 py-2 rounded-lg text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                  style={{
+                    background: isLightMode ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.06)',
+                    border: isLightMode ? '1px solid rgba(196,181,253,0.4)' : '1px solid rgba(255,255,255,0.12)',
+                    color: isLightMode ? '#1e1b4b' : '#ffffff',
+                  }}
+                  rows="3"
+                  value={categoryFormData.description}
+                  onChange={(e) => setCategoryFormData({ ...categoryFormData, description: e.target.value })} />
               </div>
               <div>
-                <label className="block text-app-secondary mb-2">Icon</label>
+                <label className="block text-sm font-medium mb-2" style={{ color: isLightMode ? '#4c1d95' : '#9ca3af' }}>Icon</label>
                 <div className="grid grid-cols-6 gap-2">
                   {emojiList.map((emoji) => (
-                    <button key={emoji} type="button" onClick={() => setCategoryFormData({ ...categoryFormData, icon: emoji })}
-                      className={`text-2xl p-2 rounded-lg hover:bg-card-hover transition-colors ${categoryFormData.icon === emoji ? 'bg-violet-500/30 ring-2 ring-violet-500' : ''}`}>
+                    <button key={emoji} type="button"
+                      onClick={() => setCategoryFormData({ ...categoryFormData, icon: emoji })}
+                      className={`text-2xl p-2 rounded-lg transition-colors ${
+                        categoryFormData.icon === emoji
+                          ? 'bg-violet-500/30 ring-2 ring-violet-500'
+                          : isLightMode ? 'hover:bg-violet-100' : 'hover:bg-white/10'
+                      }`}>
                       {emoji}
                     </button>
                   ))}
                 </div>
               </div>
               <div className="flex gap-3 pt-4">
-                <button type="submit" className="flex-1 bg-gradient-to-r from-violet-500 to-pink-500 text-white px-6 py-2 rounded-lg hover:opacity-90">
+                <button type="submit"
+                  className="flex-1 text-white px-6 py-2 rounded-lg hover:opacity-90 font-semibold transition-all"
+                  style={{ background: 'linear-gradient(135deg, #7c3aed, #db2777)' }}>
                   {editingCategory ? 'Update' : 'Create'}
                 </button>
-                <button type="button" onClick={handleCloseCategoryModal} className="px-6 py-2 bg-card text-app-primary rounded-lg hover:bg-card-hover">
+                <button type="button" onClick={handleCloseCategoryModal}
+                  className="px-6 py-2 rounded-lg font-medium transition-all hover:bg-white/10"
+                  style={{
+                    background: isLightMode ? 'rgba(237,233,254,0.6)' : 'rgba(255,255,255,0.06)',
+                    border: isLightMode ? '1px solid rgba(196,181,253,0.4)' : '1px solid rgba(255,255,255,0.12)',
+                    color: isLightMode ? '#4c1d95' : '#d1d5db',
+                  }}>
                   Cancel
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Full Detail Modal */}
-      {showDetailModal && selectedFeedback && (
+      {/* Full Detail Modal — now using createPortal */}
+      {mounted && showDetailModal && selectedFeedback && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="feedback-modal rounded-2xl w-full flex flex-col"
             style={{
@@ -874,7 +925,7 @@ const CategoryManagement = () => {
                   const db = ds ? DUE_BADGE[ds] : null;
                   return db ? <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${db.cls}`}>{db.label}</span> : null;
                 })()}
-                <button onClick={() => setShowDetailModal(false)} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all">
+                <button onClick={() => { setShowDetailModal(false); dispatchModalOpen(false); }} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -996,7 +1047,7 @@ const CategoryManagement = () => {
                     style={{ background: 'linear-gradient(135deg, #7c3aed, #db2777)', boxShadow: '0 4px 20px rgba(124,58,237,0.4)' }}>
                     Update Feedback
                   </button>
-                  <button onClick={() => setShowDetailModal(false)}
+                  <button onClick={() => { setShowDetailModal(false); dispatchModalOpen(false); }}
                     className="w-full py-2 rounded-lg font-medium text-sm transition-all hover:bg-white/10"
                     style={{ background: isLightMode ? 'rgba(237,233,254,0.6)' : 'rgba(255,255,255,0.06)', border: isLightMode ? '1px solid rgba(196,181,253,0.4)' : '1px solid rgba(255,255,255,0.12)', color: isLightMode ? '#4c1d95' : '#d1d5db' }}>
                     Close
@@ -1005,7 +1056,8 @@ const CategoryManagement = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { AlertCircle, Mail, Lock, Eye, EyeOff, Shield, BarChart2, Users, Zap } from 'lucide-react';
+import { AlertCircle, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { authAPI } from '../services/api';
 
 const Login = () => {
@@ -12,24 +12,12 @@ const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  // Page state: 'landing' | 'login'
-  const [page, setPage] = useState('landing');
-
-  useEffect(() => {
-    const fromLogout = localStorage.getItem('fromLogout') === 'true';
-    if (fromLogout) {
-      localStorage.removeItem('fromLogout');
-      setPage('login');
-    }
-  }, []);
-
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotStep, setForgotStep] = useState(1);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotCode, setForgotCode] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
   const canvasRef = useRef(null);
-  const canvas2Ref = useRef(null);
   const [forgotError, setForgotError] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -45,7 +33,6 @@ const Login = () => {
   });
   const pwStrength = validatePassword(newPassword);
 
-  // Shared canvas animation logic
   const startCanvasAnimation = (canvas) => {
     if (!canvas) return () => {};
     const ctx = canvas.getContext('2d');
@@ -93,22 +80,8 @@ const Login = () => {
   };
 
   useEffect(() => {
-    if (page === 'landing') {
-      const cleanup = startCanvasAnimation(canvasRef.current);
-      return cleanup;
-    }
-  }, [page]);
-
-  useEffect(() => {
-    if (page === 'login') {
-      const cleanup = startCanvasAnimation(canvas2Ref.current);
-      return cleanup;
-    }
-  }, [page]);
-
-  useEffect(() => {
-    document.documentElement.classList.remove('light-mode');
-    document.body.classList.remove('light-mode');
+    const cleanup = startCanvasAnimation(canvasRef.current);
+    return cleanup;
   }, []);
 
   const [error, setError] = useState(() => {
@@ -199,18 +172,16 @@ const Login = () => {
     @keyframes fadeIn { from{opacity:0} to{opacity:1} }
     @keyframes slideUp { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:translateY(0)} }
     @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+    @keyframes floatImg { 
+  0%,100%{transform:translateY(0px)} 
+  50%{transform:translateY(-16px)} 
+}
 
     .fu1{animation:fadeUp 0.6s ease 0.0s both}
     .fu2{animation:fadeUp 0.6s ease 0.1s both}
     .fu3{animation:fadeUp 0.6s ease 0.2s both}
     .fu4{animation:fadeUp 0.6s ease 0.3s both}
     .fu5{animation:fadeUp 0.6s ease 0.4s both}
-
-    .land-fade1{animation:slideUp 0.7s ease 0.0s both}
-    .land-fade2{animation:slideUp 0.7s ease 0.15s both}
-    .land-fade3{animation:slideUp 0.7s ease 0.3s both}
-    .land-fade4{animation:slideUp 0.7s ease 0.45s both}
-    .land-fade5{animation:slideUp 0.7s ease 0.6s both}
 
     .inp-wrap { position: relative; display: flex; align-items: center; }
     .inp-icon {
@@ -341,18 +312,6 @@ const Login = () => {
     .btn:hover { opacity:0.9; transform:translateY(-1px); box-shadow:0 10px 30px rgba(109,40,217,0.5) }
     .btn:disabled { opacity:0.5; cursor:not-allowed; transform:none }
 
-    .land-btn {
-      padding:16px 48px;
-      background:linear-gradient(135deg,#6D28D9,#9333ea 50%,#BE185D);
-      border:none; border-radius:14px; color:#fff;
-      font-size:17px; font-weight:700;
-      font-family:'DM Sans',sans-serif; cursor:pointer;
-      transition:all 0.3s; letter-spacing:0.3px;
-      display:inline-flex; align-items:center; gap:10px;
-      box-shadow: 0 8px 32px rgba(109,40,217,0.45);
-    }
-    .land-btn:hover { opacity:0.92; transform:translateY(-2px); box-shadow:0 16px 40px rgba(109,40,217,0.6); animation:pulse 0.6s ease; }
-
     .modal-overlay {
       position:fixed; inset:0; z-index:1000;
       background:rgba(0,0,0,0.7); backdrop-filter:blur(6px);
@@ -367,193 +326,52 @@ const Login = () => {
       position:relative;
     }
 
-    .feature-card {
-      display:flex; align-items:flex-start; gap:14px;
-      padding:16px 18px;
-      background:rgba(255,255,255,0.05);
-      border:1px solid rgba(255,255,255,0.08);
-      border-radius:14px;
-      transition: all 0.25s;
-    }
-    .feature-card:hover {
-      background:rgba(109,40,217,0.12);
-      border-color:rgba(167,139,250,0.2);
-    }
-
-    .login-inp {
-      width:100%; padding:14px 16px 14px 44px;
-      background:#f8f7ff;
-      border:1.5px solid #e8e4f8;
-      border-radius:12px; color:#1a1230;
-      font-size:14px; font-family:'DM Sans',sans-serif;
-      outline:none; transition:all 0.25s;
-    }
-    .login-inp:focus {
-      background:#fff;
-      border-color:#7c3aed;
-      box-shadow:0 0 0 3px rgba(124,58,237,0.12);
-    }
-    .login-inp::placeholder { color:#b0a8c8 }
-
-    .login-inp-pass {
-      width:100%; padding:14px 44px 14px 44px;
-      background:#f8f7ff;
-      border:1.5px solid #e8e4f8;
-      border-radius:12px; color:#1a1230;
-      font-size:14px; font-family:'DM Sans',sans-serif;
-      outline:none; transition:all 0.25s;
-    }
-    .login-inp-pass:focus {
-      background:#fff;
-      border-color:#7c3aed;
-      box-shadow:0 0 0 3px rgba(124,58,237,0.12);
-    }
-    .login-inp-pass::placeholder { color:#b0a8c8 }
-
-    .login-icon {
-      position: absolute; left: 14px;
-      color: #9d8ec5;
+    .deco-img-wrap {
+      position: absolute;
+      bottom: 80px;
+      left: 60px;
+      right: 0;
+      width: 100%;
+      max-width: 100%;
       pointer-events: none;
-      display: flex; align-items: center;
+      z-index: 0;
     }
-    .login-eye {
-      position: absolute; right: 14px;
-      color: #b0a8c8;
-      cursor: pointer;
-      display: flex; align-items: center;
-      transition: color 0.2s;
+    .deco-img-wrap img {
+      width: 95%;
+      height: auto;
+      display: block;
+      object-fit: cover;
+      object-position: top center;
+      animation: floatImg 5s ease-in-out infinite;
+      mask-image: linear-gradient(to top, transparent 0%, rgba(0,0,0,0.85) 18%, rgba(0,0,0,1) 55%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to top, transparent 0%, rgba(0,0,0,0.85) 18%, rgba(0,0,0,1) 55%, transparent 100%);
+      filter: saturate(1.4) brightness(1.05);
+      mix-blend-mode: normal;
+      opacity: 1;
     }
-    .login-eye:hover { color: #7c3aed; }
 
-    .login-btn {
-      width:100%; padding:15px;
-      background:linear-gradient(135deg,#6D28D9,#9333ea 50%,#BE185D);
-      border:none; border-radius:12px; color:#fff;
-      font-size:15px; font-weight:700;
-      font-family:'DM Sans',sans-serif; cursor:pointer;
-      transition:all 0.25s; letter-spacing:0.4px;
-      display:flex; align-items:center; justify-content:center; gap:8px;
-      box-shadow: 0 6px 24px rgba(109,40,217,0.35);
+    .deco-img-glow {
+      position: absolute;
+      bottom: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      height: 200px;
+      background: radial-gradient(ellipse, rgba(53, 2, 47, 0.7) 0%, rgba(109, 40, 217, 0.2) 50%, transparent 80%);
+      pointer-events: none;
+      z-index: 0;
     }
-    .login-btn:hover { opacity:0.92; transform:translateY(-1px); box-shadow:0 12px 32px rgba(109,40,217,0.5) }
-    .login-btn:disabled { opacity:0.5; cursor:not-allowed; transform:none }
+
+    /* Hide scrollbar for all browsers */
+    body {
+      overflow: hidden;
+    }
+    
+    ::-webkit-scrollbar {
+      display: none;
+    }
   `;
 
-  // ── LANDING PAGE ──
-  if (page === 'landing') {
-    return (
-      <div style={{
-        height:'100vh', width:'100vw', overflow:'hidden',
-        display:'flex', flexDirection:'column',
-        background:'#1a0008',
-        fontFamily:"'DM Sans', sans-serif",
-        position:'relative',
-        alignItems:'center', justifyContent:'center',
-      }}>
-        <canvas ref={canvasRef} style={{
-          position:'absolute', inset:0,
-          width:'100%', height:'100%', zIndex:0,
-        }} />
-
-        <style>{sharedStyles}</style>
-
-        {/* Top brand bar */}
-        <div style={{
-          position:'absolute', top:0, left:0, right:0,
-          padding:'20px 40px',
-          display:'flex', alignItems:'center', gap:'14px',
-          zIndex:2,
-        }}>
-          <h1 style={{
-            fontFamily:"'Playfair Display', Georgia, serif",
-            fontSize:'28px', fontWeight:900, lineHeight:1,
-            color:'#ffffff', margin:0,
-            textShadow:'0 4px 30px rgba(0,0,0,0.5)',
-            whiteSpace:'nowrap',
-          }}>
-            Class<span style={{ color:'#c4b5fd', fontStyle:'italic' }}>Back</span>
-          </h1>
-          <div style={{
-            width:2, height:22,
-            background:'linear-gradient(180deg,#6D28D9,#BE185D)',
-            borderRadius:2, flexShrink:0,
-          }} />
-          <p style={{
-            fontSize:'13px', fontWeight:500,
-            color:'rgba(228,224,224,0.7)',
-            letterSpacing:'0.15em', textTransform:'uppercase', lineHeight:1.3,
-            margin:0, whiteSpace:'nowrap',
-          }}>
-            Classroom Feedback &amp; Suggestion System
-          </p>
-        </div>
-
-        {/* Shimmer dots — reduced to 2 subtle ones only */}
-        {[
-          { top:'15%', left:'8%',  size:4, c:'#a78bfa', d:'0s' },
-          { top:'80%', left:'85%', size:3, c:'#f472b6', d:'0.4s' },
-        ].map((s, i) => (
-          <div key={i} style={{
-            position:'absolute', top:s.top, left:s.left,
-            width:s.size, height:s.size, borderRadius:'50%',
-            background:s.c, boxShadow:`0 0 ${s.size*4}px ${s.c}`,
-            animation:`shimmer 2.5s ease-in-out ${s.d} infinite`,
-            zIndex:1,
-          }} />
-        ))}
-
-        {/* Center content */}
-        <div style={{
-          position:'relative', zIndex:2,
-          display:'flex', flexDirection:'column',
-          alignItems:'center', textAlign:'center',
-          maxWidth:'900px', padding:'0 32px',
-          marginTop:'80px',
-        }}>
-          {/* REMOVED: Sparkle badge "✦ Classroom Feedback & Suggestion System" */}
-
-          <h1 className="land-fade2" style={{
-            fontFamily:"'Playfair Display', Georgia, serif",
-            fontSize:'clamp(28px, 3.8vw, 52px)',
-            fontWeight:900, lineHeight:1.1,
-            color:'#ffffff', margin:'0 0 4px 0',
-            whiteSpace:'nowrap',
-          }}>
-            Transform Your Classroom with
-          </h1>
-          <h1 className="land-fade2" style={{
-            fontFamily:"'Playfair Display', Georgia, serif",
-            fontSize:'clamp(28px, 3.8vw, 52px)',
-            fontWeight:900, lineHeight:1.15,
-            color:'rgba(196,181,253,0.85)',
-            margin:'0 0 28px 0',
-            whiteSpace:'nowrap',
-          }}>
-            Real-Time Feedback
-          </h1>
-
-          <p className="land-fade3" style={{
-            fontSize:'clamp(14px, 1.6vw, 17px)',
-            color:'rgba(255,255,255,0.6)',
-            lineHeight:1.7, marginBottom:'40px', maxWidth:'560px',
-          }}>
-            Empower students to share their thoughts, suggestions, and feedback anonymously. Create a better learning environment through open communication and continuous improvement.
-          </p>
-
-          <div className="land-fade4">
-            {/* REMOVED: Zap icon from Get Started button */}
-            <button className="land-btn" onClick={() => setPage('login')}>
-              Get Started
-            </button>
-          </div>
-
-
-        </div>
-      </div>
-    );
-  }
-
-  // ── LOGIN PAGE ──
   return (
     <div style={{
       height:'100vh', width:'100vw', overflow:'hidden',
@@ -561,12 +379,43 @@ const Login = () => {
       fontFamily:"'DM Sans', sans-serif",
       position:'relative',
     }}>
-      <canvas ref={canvas2Ref} style={{
+      <canvas ref={canvasRef} style={{
         position:'absolute', inset:0,
         width:'100%', height:'100%', zIndex:0,
       }} />
 
       <style>{sharedStyles}</style>
+
+      {/* School Logo in Upper Right Corner */}
+      <div style={{
+        position: 'absolute',
+        top: '30px',
+        right: '40px',
+        zIndex: 20,
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'scale(1.05)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'scale(1)';
+      }}>
+        <img
+          src="/tmc.jpg"
+          alt="School Logo"
+          style={{
+            width: '55px',
+            height: '55px',
+            objectFit: 'cover',
+            borderRadius: '50%',
+            border: '2px solid rgba(139, 92, 246, 0.6)',
+            boxShadow: '0 0 15px rgba(139, 92, 246, 0.3)',
+            background: 'rgba(20, 5, 40, 0.5)',
+            backdropFilter: 'blur(4px)',
+          }}
+        />
+      </div>
 
       {/* Forgot Password Modal */}
       {showForgotModal && (
@@ -720,93 +569,37 @@ const Login = () => {
         </div>
       )}
 
-      {/* ── LEFT panel: Info / Features ── */}
+      {/* ── LEFT panel ── */}
       <div style={{
-        width:'50%', position:'relative', overflow:'hidden',
-        display:'flex', flexDirection:'column', justifyContent:'center',
-        zIndex:1, padding:'100px 48px 56px 180px',
+        width:'50%', position:'relative', overflow:'visible',
+        display:'flex', flexDirection:'column',
+        justifyContent:'flex-start',
+        zIndex:2, padding:'28px 48px 56px 60px',
       }}>
-        {/* Back button */}
-        <button onClick={() => setPage('landing')} style={{
-          position:'absolute', top:24, left:32,
-          background:'rgba(255,255,255,0.08)',
-          border:'1px solid rgba(255,255,255,0.12)',
-          borderRadius:'999px', padding:'7px 16px',
-          color:'rgba(255,255,255,0.6)', fontSize:'13px',
-          cursor:'pointer', display:'flex', alignItems:'center', gap:6,
-          fontFamily:"'DM Sans',sans-serif", fontWeight:500,
-          transition:'all 0.2s',
-        }}
-          onMouseEnter={e => { e.currentTarget.style.background='rgba(255,255,255,0.13)'; e.currentTarget.style.color='#fff'; }}
-          onMouseLeave={e => { e.currentTarget.style.background='rgba(255,255,255,0.08)'; e.currentTarget.style.color='rgba(255,255,255,0.6)'; }}
-        >
-          ← Back
-        </button>
-
-        {/* Brand */}
-        <div className="fu1" style={{ display:'flex', alignItems:'center', gap:12, marginBottom:32 }}>
-          <div style={{
-            width:44, height:44, borderRadius:12,
-            background:'linear-gradient(135deg,#6D28D9,#BE185D)',
-            display:'flex', alignItems:'center', justifyContent:'center',
-            fontSize:'20px', flexShrink:0,
-          }}>💬</div>
-          <div>
-            <div style={{
-              fontFamily:"'Playfair Display', Georgia, serif",
-              fontSize:'22px', fontWeight:900, color:'#fff',
-            }}>
-              Class<span style={{ color:'#c4b5fd', fontStyle:'italic' }}>Back</span>
-            </div>
-            <div style={{ fontSize:'11px', color:'rgba(255,255,255,0.4)', letterSpacing:'0.12em', textTransform:'uppercase' }}>
-              ClassFeedback
-            </div>
-          </div>
+        <div className="deco-img-glow" />
+        <div className="deco-img-wrap">
+          <img src="/pictyur.png" alt="" aria-hidden="true" />
         </div>
 
-        <h2 className="fu2" style={{
+        <h2 className="fu1" style={{
           fontFamily:"'Playfair Display', Georgia, serif",
-          fontSize:'clamp(28px, 3.5vw, 44px)',
+          fontSize:'clamp(26px, 3vw, 42px)',
           fontWeight:900, color:'#fff', lineHeight:1.15,
-          marginBottom:'16px',
+          marginBottom:'14px',
+          position:'relative', zIndex:2,
+          whiteSpace:'nowrap',
         }}>
-          Welcome Back to Your<br />
-          <span style={{ background:'linear-gradient(135deg,#a78bfa,#f472b6)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>
-            Feedback Dashboard
-          </span>
+          Welcome Back to Your <span style={{ background:'linear-gradient(135deg,#a78bfa,#f472b6)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>Feedback Dashboard</span>
         </h2>
 
-        <p className="fu3" style={{
+        <p className="fu2" style={{
           fontSize:'15px', color:'rgba(255,255,255,0.45)',
-          lineHeight:1.7, marginBottom:'36px', maxWidth:'420px',
+          lineHeight:1.7, marginBottom:0,
+          position:'relative', zIndex:2,
+          whiteSpace:'nowrap',
         }}>
           Manage student feedback, track engagement, and build a better classroom environment through data-driven insights.
         </p>
-
-        {/* Feature cards */}
-        <div className="fu4" style={{ display:'flex', flexDirection:'column', gap:12, maxWidth:'420px' }}>
-          {[
-            { icon: <Shield size={18} />, color:'#6D28D9', label:'Secure & Private', desc:'All feedback data is encrypted and protected' },
-            { icon: <BarChart2 size={18} />, color:'#9333ea', label:'Real-Time Analytics', desc:'Monitor feedback trends as they happen' },
-            { icon: <Users size={18} />, color:'#BE185D', label:'Student Engagement', desc:'Empower every voice in your classroom' },
-          ].map((f, i) => (
-            <div key={i} className="feature-card">
-              <div style={{
-                width:36, height:36, borderRadius:10, flexShrink:0,
-                background:`${f.color}25`,
-                border:`1px solid ${f.color}40`,
-                display:'flex', alignItems:'center', justifyContent:'center',
-                color:f.color === '#6D28D9' ? '#a78bfa' : f.color === '#9333ea' ? '#c084fc' : '#f472b6',
-              }}>
-                {f.icon}
-              </div>
-              <div>
-                <div style={{ fontSize:'14px', fontWeight:700, color:'#fff', marginBottom:3 }}>{f.label}</div>
-                <div style={{ fontSize:'12px', color:'rgba(255,255,255,0.38)' }}>{f.desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* ── RIGHT: Login form ── */}
@@ -815,20 +608,21 @@ const Login = () => {
         display:'flex', flexDirection:'column', justifyContent:'center',
         alignItems:'center',
         position:'relative', zIndex:1,
-        padding:'150px 80px 40px 32px',
+        padding:'100px 80px 40px 32px',
       }}>
         <div style={{
-          width:'100%', maxWidth:'440px',
+          width:'100%', maxWidth:'630px',
+          height: '490px',
           background:'rgba(10,4,18,0.75)',
+          marginLeft:'32px',
           backdropFilter:'blur(24px)',
           borderRadius:'24px',
           border:'1px solid rgba(167,139,250,0.15)',
-          padding:'40px 36px',
+          padding:'15px 26px',
           boxShadow:'0 24px 80px rgba(0,0,0,0.6)',
           animation:'fadeUp 0.5s ease 0.1s both',
           position:'relative', overflow:'hidden',
         }}>
-          {/* Glow accents */}
           <div style={{
             position:'absolute', top:-60, right:-60, width:200, height:200,
             background:'radial-gradient(circle,rgba(109,40,217,0.25),transparent 70%)',
@@ -840,17 +634,34 @@ const Login = () => {
             borderRadius:'50%', pointerEvents:'none',
           }} />
 
+          {/* ✅ Logo added here inside the card */}
+         
+<div style={{ position:'relative', zIndex:1, marginBottom:'20px', display:'flex', justifyContent:'center' }}>
+  <img
+    src="/las.png"
+    alt="Logo"
+    style={{
+      width:'72px',
+      height:'72px',
+      objectFit:'cover',
+      borderRadius:'50%',
+      border:'2px solid rgba(167,139,250,0.4)',
+    }}
+  />
+</div>
+
           {/* Header */}
-          <div style={{ position:'relative', zIndex:1, marginBottom:'28px' }}>
-            <h2 style={{
-              fontFamily:"'Playfair Display', Georgia, serif",
-              fontSize:'26px', fontWeight:900, color:'#ffffff',
-              lineHeight:1.2, margin:'0 0 6px 0',
-            }}>Sign In to Dashboard</h2>
-            <p style={{ fontSize:'13px', color:'rgba(255,255,255,0.38)', margin:0 }}>
-              Enter your credentials to access your account
-            </p>
-          </div>
+        <div style={{ position:'relative', zIndex:1, marginBottom:'28px', textAlign:'center' }}>
+  <h2 style={{
+    fontFamily:"'Playfair Display', Georgia, serif",
+    fontSize:'26px', fontWeight:900, lineHeight:1.2, margin:'0 0 6px 0',
+    background:'linear-gradient(135deg,#a78bfa,#f472b6)',
+    WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+  }}>ClassBack</h2>
+  <p style={{ fontSize:'13px', color:'rgba(255,255,255,0.38)', margin:0 }}>
+    Enter your credentials to access your account
+  </p>
+</div>
 
           {error && (
             <div style={{
@@ -866,7 +677,6 @@ const Login = () => {
           )}
 
           <form onSubmit={handleSubmit} style={{ position:'relative', zIndex:1 }}>
-            {/* Email */}
             <div style={{ marginBottom:'16px' }}>
               <label style={{
                 display:'flex', alignItems:'center', gap:6,
@@ -884,7 +694,6 @@ const Login = () => {
               </div>
             </div>
 
-            {/* Password */}
             <div style={{ marginBottom:'10px' }}>
               <label style={{
                 display:'flex', alignItems:'center', gap:6,
@@ -905,7 +714,6 @@ const Login = () => {
               </div>
             </div>
 
-            {/* Remember me + Forgot */}
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'22px' }}>
               <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
                 <input type="checkbox" style={{ accentColor:'#7c3aed', width:15, height:15 }} />
@@ -930,9 +738,132 @@ const Login = () => {
               )}
             </button>
           </form>
-
-
         </div>
+      </div>
+
+      {/* Three buttons placed horizontally in the middle between left picture and login form - adjusted lower, dark violet/blacklight style, and more faint */}
+      <div style={{
+        position: 'absolute',
+        left: '25%',
+        top: 'calc(50% + 320px)',
+        transform: 'translate(-50%, -50%)',
+        zIndex: 10,
+        display: 'flex',
+        gap: '20px',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
+        <button
+          onClick={() => {
+            console.log('Anonymous Feedback clicked');
+          }}
+          style={{
+            padding: '12px 24px',
+            background: 'rgba(20, 5, 40, 0.55)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(139, 92, 246, 0.3)',
+            borderRadius: '40px',
+            color: '#c4b5fd',
+            fontSize: '14px',
+            fontWeight: '600',
+            fontFamily: "'DM Sans', sans-serif",
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            letterSpacing: '0.3px',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 0 10px rgba(139, 92, 246, 0.1)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-3px)';
+            e.currentTarget.style.boxShadow = '0 0 20px rgba(139, 92, 246, 0.3)';
+            e.currentTarget.style.background = 'rgba(30, 10, 60, 0.7)';
+            e.currentTarget.style.borderColor = 'rgba(167, 139, 250, 0.5)';
+            e.currentTarget.style.color = '#e9d5ff';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 0 10px rgba(139, 92, 246, 0.1)';
+            e.currentTarget.style.background = 'rgba(20, 5, 40, 0.55)';
+            e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+            e.currentTarget.style.color = '#c4b5fd';
+          }}
+        >
+          📝 Anonymous Feedback
+        </button>
+        <button
+          onClick={() => {
+            console.log('Manage Students clicked');
+          }}
+          style={{
+            padding: '12px 24px',
+            background: 'rgba(20, 5, 40, 0.55)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(139, 92, 246, 0.3)',
+            borderRadius: '40px',
+            color: '#c4b5fd',
+            fontSize: '14px',
+            fontWeight: '600',
+            fontFamily: "'DM Sans', sans-serif",
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            letterSpacing: '0.3px',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 0 10px rgba(139, 92, 246, 0.1)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-3px)';
+            e.currentTarget.style.boxShadow = '0 0 20px rgba(139, 92, 246, 0.3)';
+            e.currentTarget.style.background = 'rgba(30, 10, 60, 0.7)';
+            e.currentTarget.style.borderColor = 'rgba(167, 139, 250, 0.5)';
+            e.currentTarget.style.color = '#e9d5ff';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 0 10px rgba(139, 92, 246, 0.1)';
+            e.currentTarget.style.background = 'rgba(20, 5, 40, 0.55)';
+            e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+            e.currentTarget.style.color = '#c4b5fd';
+          }}
+        >
+          👥 Manage Students
+        </button>
+        <button
+          onClick={() => {
+            console.log('Help the School clicked');
+          }}
+          style={{
+            padding: '12px 24px',
+            background: 'rgba(20, 5, 40, 0.55)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(139, 92, 246, 0.3)',
+            borderRadius: '40px',
+            color: '#c4b5fd',
+            fontSize: '14px',
+            fontWeight: '600',
+            fontFamily: "'DM Sans', sans-serif",
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            letterSpacing: '0.3px',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 0 10px rgba(139, 92, 246, 0.1)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-3px)';
+            e.currentTarget.style.boxShadow = '0 0 20px rgba(139, 92, 246, 0.3)';
+            e.currentTarget.style.background = 'rgba(30, 10, 60, 0.7)';
+            e.currentTarget.style.borderColor = 'rgba(167, 139, 250, 0.5)';
+            e.currentTarget.style.color = '#e9d5ff';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 0 10px rgba(139, 92, 246, 0.1)';
+            e.currentTarget.style.background = 'rgba(20, 5, 40, 0.55)';
+            e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+            e.currentTarget.style.color = '#c4b5fd';
+          }}
+        >
+          🏫 Help the School
+        </button>
       </div>
     </div>
   );
