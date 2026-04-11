@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
+const hpp = require('hpp'); // ✅ ADDED
 const rateLimit = require('express-rate-limit');
 const cron = require('node-cron');
 
@@ -24,25 +25,36 @@ app.use(cors({
 
 app.use(mongoSanitize()); // blocks MongoDB injection
 app.use(xss());           // blocks XSS attacks
+app.use(hpp());           // ✅ ADDED: blocks HTTP Parameter Pollution attacks
+
+// ✅ MOVED: health check before rate limiter so Render's pings don't get 429'd and crash the server
+app.get('/', (req, res) => {
+  res.json({ 
+    success: true,
+    message: 'Student Feedback System API is running!',
+    version: '1.0.0'
+  });
+});
 
 // ── Rate Limiters ──
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 100,
   message: { success: false, message: 'Too many requests, please try again later.' }
 });
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // stricter for login/auth
+  windowMs: 15 * 60 * 1000,
+  max: 20,
   message: { success: false, message: 'Too many login attempts, please try again later.' }
 });
 
 app.use(globalLimiter);
 
 // ── Body Parsers ──
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// ✅ CHANGED: reduced from 10mb to 50kb — files go through Cloudinary, JSON doesn't need 10mb
+app.use(express.json({ limit: '50kb' }));
+app.use(express.urlencoded({ extended: true, limit: '50kb' }));
 
 // ── Database ──
 mongoose.connect(process.env.MONGODB_URI, {
@@ -60,24 +72,16 @@ const userRoutes          = require('./routes/user');
 const analyticsRoutes     = require('./routes/analytics');
 const announcementRoutes  = require('./routes/announcements');
 const messageRoutes       = require('./routes/messages');
-const notificationRoutes  = require('./routes/notifications'); // ✅ NEW
+const notificationRoutes  = require('./routes/notifications');
 
-app.use('/api/auth',          authLimiter, authRoutes);  // stricter limit on auth
+app.use('/api/auth',          authLimiter, authRoutes);
 app.use('/api/feedback',      feedbackRoutes);
 app.use('/api/categories',    categoryRoutes);
 app.use('/api/users',         userRoutes);
 app.use('/api/analytics',     analyticsRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/messages',      messageRoutes);
-app.use('/api/notifications', notificationRoutes); // ✅ NEW
-
-app.get('/', (req, res) => {
-  res.json({ 
-    success: true,
-    message: 'Student Feedback System API is running!',
-    version: '1.0.0'
-  });
-});
+app.use('/api/notifications', notificationRoutes);
 
 // ── 404 Handler ──
 app.use((req, res) => {
@@ -118,7 +122,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ── Overdue feedback checker — replaced setInterval with node-cron ──
+// ── Overdue feedback checker ──
 const Feedback = require('./models/Feedback');
 const { createNotification } = require('./utils/notificationHelper');
 
@@ -146,7 +150,6 @@ const checkOverdueFeedback = async () => {
   }
 };
 
-// ✅ Replaced setInterval with node-cron (more reliable)
 cron.schedule('*/10 * * * *', checkOverdueFeedback);
 
 const PORT = process.env.PORT || 5000;

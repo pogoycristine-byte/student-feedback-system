@@ -1,5 +1,27 @@
 const Feedback = require('../models/Feedback');
-const { createNotification } = require('../utils/notificationHelper'); // ✅ NEW
+const { createNotification } = require('../utils/notificationHelper');
+
+// ── Input sanitizer helper ──
+const sanitizeString = (str) => {
+  if (!str) return str;
+  return str
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+};
+
+// ── Input length limits ──
+const LIMITS = {
+  subject: 200,
+  description: 5000,
+  teacherName: 100,
+  location: 200,
+  dateTime: 100,
+  otherSpecification: 300,
+  message: 2000,
+};
 
 // @desc    Submit new feedback with media
 exports.submitFeedback = async (req, res) => {
@@ -13,20 +35,41 @@ exports.submitFeedback = async (req, res) => {
       });
     }
 
+    if (subject.length > LIMITS.subject) {
+      return res.status(400).json({ success: false, message: `Subject must be under ${LIMITS.subject} characters` });
+    }
+    if (description.length > LIMITS.description) {
+      return res.status(400).json({ success: false, message: `Description must be under ${LIMITS.description} characters` });
+    }
+    if (teacherName && teacherName.length > LIMITS.teacherName) {
+      return res.status(400).json({ success: false, message: `Teacher name must be under ${LIMITS.teacherName} characters` });
+    }
+    if (otherSpecification && otherSpecification.length > LIMITS.otherSpecification) {
+      return res.status(400).json({ success: false, message: `Specification must be under ${LIMITS.otherSpecification} characters` });
+    }
+
+    const allowedPriorities = ['Low', 'Medium', 'High'];
+    if (priority && !allowedPriorities.includes(priority)) {
+      return res.status(400).json({ success: false, message: 'Invalid priority value' });
+    }
+
     const feedbackData = {
       student: req.user.id,
       isAnonymous: isAnonymous || false,
       category,
-      subject,
-      teacherName: teacherName || '',
-      description,
+      subject: sanitizeString(subject),
+      teacherName: sanitizeString(teacherName) || '',
+      description: sanitizeString(description),
       priority: priority || 'Medium',
-      location: location || 'TMC Main Campus',
-      dateTime: dateTime || '',
-      otherSpecification: otherSpecification || null,
+      location: sanitizeString(location) || 'TMC Main Campus',
+      dateTime: sanitizeString(dateTime) || '',
+      otherSpecification: sanitizeString(otherSpecification) || null,
     };
 
     if (req.files && req.files.length > 0) {
+      if (req.files.length > 5) {
+        return res.status(400).json({ success: false, message: 'Maximum 5 files allowed' });
+      }
       feedbackData.media = req.files.map(file => ({
         url: file.path,
         publicId: file.filename,
@@ -39,7 +82,6 @@ exports.submitFeedback = async (req, res) => {
     await feedback.populate('student', 'name studentId email yearLevel section');
     await feedback.populate('category', 'name');
 
-    // ✅ NEW
     await createNotification({
       type: 'new_feedback',
       title: '📋 New Feedback Submitted',
@@ -59,7 +101,7 @@ exports.submitFeedback = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error submitting feedback',
-      error: error.message
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -72,14 +114,22 @@ exports.getMyFeedback = async (req, res) => {
     let query = { student: req.user.id };
 
     if (status && status !== 'All') {
+      const allowedStatuses = ['Pending', 'Under Review', 'Resolved', 'Rejected'];
+      if (!allowedStatuses.includes(status)) {
+        return res.status(400).json({ success: false, message: 'Invalid status value' });
+      }
       query.status = status;
     }
 
     if (search) {
+      if (search.length > 100) {
+        return res.status(400).json({ success: false, message: 'Search term too long' });
+      }
+      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
-        { subject: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { teacherName: { $regex: search, $options: 'i' } }
+        { subject: { $regex: escapedSearch, $options: 'i' } },
+        { description: { $regex: escapedSearch, $options: 'i' } },
+        { teacherName: { $regex: escapedSearch, $options: 'i' } }
       ];
     }
 
@@ -97,7 +147,7 @@ exports.getMyFeedback = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching feedback',
-      error: error.message
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -127,7 +177,7 @@ exports.getFeedbackById = async (req, res) => {
     }
 
     const feedbackObj = feedback.toObject();
-    
+
     if (feedbackObj.isAnonymous && req.user.role !== 'admin' && req.user.role !== 'student') {
       feedbackObj.student = {
         name: 'Anonymous Student',
@@ -147,7 +197,7 @@ exports.getFeedbackById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching feedback',
-      error: error.message
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -160,6 +210,10 @@ exports.getAllFeedback = async (req, res) => {
     let query = {};
 
     if (status && status !== 'All') {
+      const allowedStatuses = ['Pending', 'Under Review', 'Resolved', 'Rejected'];
+      if (!allowedStatuses.includes(status)) {
+        return res.status(400).json({ success: false, message: 'Invalid status value' });
+      }
       query.status = status;
     }
 
@@ -168,20 +222,41 @@ exports.getAllFeedback = async (req, res) => {
     }
 
     if (priority && priority !== 'All') {
+      const allowedPriorities = ['Low', 'Medium', 'High'];
+      if (!allowedPriorities.includes(priority)) {
+        return res.status(400).json({ success: false, message: 'Invalid priority value' });
+      }
       query.priority = priority;
     }
 
+    // ✅ ADDED: validate dateFrom and dateTo before using them
     if (dateFrom || dateTo) {
       query.createdAt = {};
-      if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
-      if (dateTo) query.createdAt.$lte = new Date(dateTo);
+      if (dateFrom) {
+        const d = new Date(dateFrom);
+        if (isNaN(d.getTime())) {
+          return res.status(400).json({ success: false, message: 'Invalid dateFrom value' });
+        }
+        query.createdAt.$gte = d;
+      }
+      if (dateTo) {
+        const d = new Date(dateTo);
+        if (isNaN(d.getTime())) {
+          return res.status(400).json({ success: false, message: 'Invalid dateTo value' });
+        }
+        query.createdAt.$lte = d;
+      }
     }
 
     if (search) {
+      if (search.length > 100) {
+        return res.status(400).json({ success: false, message: 'Search term too long' });
+      }
+      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
-        { subject: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { teacherName: { $regex: search, $options: 'i' } }
+        { subject: { $regex: escapedSearch, $options: 'i' } },
+        { description: { $regex: escapedSearch, $options: 'i' } },
+        { teacherName: { $regex: escapedSearch, $options: 'i' } }
       ];
     }
 
@@ -194,7 +269,7 @@ exports.getAllFeedback = async (req, res) => {
 
     const processedFeedback = feedback.map(item => {
       const itemObj = item.toObject();
-      
+
       if (itemObj.isAnonymous && req.user.role !== 'admin') {
         itemObj.student = {
           name: 'Anonymous Student',
@@ -205,7 +280,7 @@ exports.getAllFeedback = async (req, res) => {
           profilePicture: null,
         };
       }
-      
+
       return itemObj;
     });
 
@@ -218,7 +293,7 @@ exports.getAllFeedback = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching feedback',
-      error: error.message
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -235,8 +310,17 @@ exports.updateFeedbackStatus = async (req, res) => {
       });
     }
 
+    const allowedStatuses = ['Pending', 'Under Review', 'Resolved', 'Rejected'];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status value' });
+    }
+
+    if (comment && comment.length > LIMITS.message) {
+      return res.status(400).json({ success: false, message: `Comment must be under ${LIMITS.message} characters` });
+    }
+
     const feedback = await Feedback.findById(req.params.id)
-      .populate('student', 'name'); // ✅ NEW: populate for notification
+      .populate('student', 'name');
 
     if (!feedback) {
       return res.status(404).json({
@@ -245,14 +329,14 @@ exports.updateFeedbackStatus = async (req, res) => {
       });
     }
 
-    const oldStatus = feedback.status; // ✅ NEW
+    const oldStatus = feedback.status;
 
     feedback.status = status;
     feedback.lastUpdatedBy = req.user.id;
 
     if (comment) {
       feedback.adminResponse = {
-        comment,
+        comment: sanitizeString(comment),
         respondedBy: req.user.id,
         respondedAt: new Date()
       };
@@ -262,13 +346,12 @@ exports.updateFeedbackStatus = async (req, res) => {
       status,
       changedBy: req.user.id,
       changedAt: new Date(),
-      comment: comment || ''
+      comment: sanitizeString(comment) || ''
     });
 
     feedback.isRead = true;
     await feedback.save();
 
-    // ✅ NEW
     if (oldStatus !== status) {
       await createNotification({
         type: 'status_changed',
@@ -295,14 +378,21 @@ exports.updateFeedbackStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error updating feedback status',
-      error: error.message
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
 
-// @desc    Delete feedback (Admin & Staff)
+// @desc    Delete feedback (Admin only)
 exports.deleteFeedback = async (req, res) => {
   try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized. Admin only.'
+      });
+    }
+
     const feedback = await Feedback.findById(req.params.id);
 
     if (!feedback) {
@@ -338,7 +428,7 @@ exports.deleteFeedback = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error deleting feedback',
-      error: error.message
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -355,8 +445,15 @@ exports.sendMessage = async (req, res) => {
       });
     }
 
+    if (message.length > LIMITS.message) {
+      return res.status(400).json({
+        success: false,
+        message: `Message must be under ${LIMITS.message} characters`
+      });
+    }
+
     const feedback = await Feedback.findById(req.params.id)
-      .populate('student', 'name'); // ✅ NEW: populate for notification
+      .populate('student', 'name');
 
     if (!feedback) {
       return res.status(404).json({
@@ -378,12 +475,12 @@ exports.sendMessage = async (req, res) => {
     feedback.messages.push({
       sender: req.user.id,
       senderRole: req.user.role,
-      message: message.trim()
+      message: sanitizeString(message.trim())
     });
 
     if ((req.user.role === 'admin' || req.user.role === 'staff') && !feedback.adminResponse?.comment) {
       feedback.adminResponse = {
-        comment: message.trim(),
+        comment: sanitizeString(message.trim()),
         respondedBy: req.user.id,
         respondedAt: new Date()
       };
@@ -391,7 +488,6 @@ exports.sendMessage = async (req, res) => {
 
     await feedback.save();
 
-    // ✅ NEW
     if (req.user.role === 'student') {
       await createNotification({
         type: 'student_reply',
@@ -415,7 +511,7 @@ exports.sendMessage = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error sending message',
-      error: error.message
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -441,7 +537,6 @@ exports.getMessages = async (req, res) => {
     const isAdminOrStaff = req.user.role === 'admin' || req.user.role === 'staff';
 
     if (!isStudent && !isAdminOrStaff) {
-      console.log(`403 getMessages: studentId=${studentId} userId=${userId} role=${req.user.role}`);
       return res.status(403).json({
         success: false,
         message: 'Not authorized to view messages'
@@ -449,7 +544,7 @@ exports.getMessages = async (req, res) => {
     }
 
     const feedbackObj = feedback.toObject();
-    
+
     if (feedbackObj.isAnonymous && req.user.role === 'staff') {
       feedbackObj.student = {
         _id: feedbackObj.student._id,
@@ -476,7 +571,7 @@ exports.getMessages = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching messages',
-      error: error.message
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -485,51 +580,61 @@ exports.getMessages = async (req, res) => {
 exports.submitRating = async (req, res) => {
   try {
     const { satisfactionRating, satisfactionComment } = req.body;
-    
+
     const feedback = await Feedback.findById(req.params.id);
-    
+
     if (!feedback) {
       return res.status(404).json({
         success: false,
         message: 'Feedback not found'
       });
     }
-    
+
     if (feedback.student.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'You can only rate your own feedback'
       });
     }
-    
+
     if (feedback.status !== 'Resolved') {
       return res.status(400).json({
         success: false,
         message: 'You can only rate resolved feedback'
       });
     }
-    
+
     if (feedback.satisfactionRating) {
       return res.status(400).json({
         success: false,
         message: 'You have already rated this feedback'
       });
     }
-    
-    if (!satisfactionRating || satisfactionRating < 1 || satisfactionRating > 5) {
+
+    // ✅ ADDED: proper type check to prevent string coercion bypass
+    const rating = Number(satisfactionRating);
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
       return res.status(400).json({
         success: false,
-        message: 'Rating must be between 1 and 5'
+        message: 'Rating must be a whole number between 1 and 5'
       });
     }
-    
-    feedback.satisfactionRating = satisfactionRating;
-    feedback.satisfactionComment = satisfactionComment || '';
+
+    if (satisfactionComment && satisfactionComment.length > 500) {
+      return res.status(400).json({
+        success: false,
+        message: 'Comment must be under 500 characters'
+      });
+    }
+
+    // ✅ CHANGED: use validated rating variable instead of raw input
+    feedback.satisfactionRating = rating;
+    feedback.satisfactionComment = sanitizeString(satisfactionComment) || '';
     feedback.ratedAt = new Date();
-    
+
     await feedback.save();
-    
-    res.json({ 
+
+    res.json({
       success: true,
       message: 'Rating submitted successfully',
       feedback: {
@@ -539,13 +644,12 @@ exports.submitRating = async (req, res) => {
         ratedAt: feedback.ratedAt
       }
     });
-    
   } catch (error) {
     console.error('Error submitting rating:', error);
     res.status(500).json({
       success: false,
       message: 'Error submitting rating',
-      error: error.message
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

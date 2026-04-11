@@ -5,18 +5,30 @@ exports.getAllUsers = async (req, res) => {
   try {
     const { yearLevel, section, search, isActive, role } = req.query;
 
-    // ── CHANGED: use the role query param if provided, otherwise return ALL roles ──
     let query = {};
+
+    // ✅ ADDED: whitelist allowed role values
+    const allowedRoles = ['student', 'staff', 'admin'];
     if (role) {
+      if (!allowedRoles.includes(role)) {
+        return res.status(400).json({ success: false, message: 'Invalid role value' });
+      }
       query.role = role;
     }
-    // ── END CHANGE ──
 
     if (yearLevel) {
+      // ✅ ADDED: limit yearLevel length
+      if (yearLevel.length > 20) {
+        return res.status(400).json({ success: false, message: 'Invalid yearLevel value' });
+      }
       query.yearLevel = yearLevel;
     }
 
     if (section) {
+      // ✅ ADDED: limit section length
+      if (section.length > 20) {
+        return res.status(400).json({ success: false, message: 'Invalid section value' });
+      }
       query.section = section;
     }
 
@@ -25,10 +37,16 @@ exports.getAllUsers = async (req, res) => {
     }
 
     if (search) {
+      // ✅ ADDED: limit search length
+      if (search.length > 100) {
+        return res.status(400).json({ success: false, message: 'Search term too long' });
+      }
+      // ✅ ADDED: escape regex to prevent ReDoS attack
+      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { studentId: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
+        { name: { $regex: escapedSearch, $options: 'i' } },
+        { studentId: { $regex: escapedSearch, $options: 'i' } },
+        { email: { $regex: escapedSearch, $options: 'i' } },
       ];
     }
 
@@ -45,7 +63,7 @@ exports.getAllUsers = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching users',
-      error: error.message,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
@@ -82,7 +100,7 @@ exports.getUserById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching user',
-      error: error.message,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
@@ -90,12 +108,21 @@ exports.getUserById = async (req, res) => {
 // @desc    Toggle user status (Admin)
 exports.toggleUserStatus = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    // ✅ ADDED: exclude password from response
+    const user = await User.findById(req.params.id).select('-password');
 
     if (!user) {
       return res.status(404).json({
         success: false,
         message: 'User not found',
+      });
+    }
+
+    // ✅ ADDED: prevent admin from deactivating their own account
+    if (req.user.id === user._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot deactivate your own account',
       });
     }
 
@@ -111,7 +138,7 @@ exports.toggleUserStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error updating user status',
-      error: error.message,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
@@ -125,6 +152,22 @@ exports.deleteUser = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'User not found',
+      });
+    }
+
+    // ✅ ADDED: prevent admin from deleting their own account
+    if (req.user.id === user._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot delete your own account',
+      });
+    }
+
+    // ✅ ADDED: prevent deleting other admins
+    if (user.role === 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin accounts cannot be deleted',
       });
     }
 
@@ -148,7 +191,7 @@ exports.deleteUser = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error deleting user',
-      error: error.message,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };

@@ -7,7 +7,40 @@ const { cloudinary } = require('../middleware/upload');
 // ── In-memory reset code store { email: { code, expiresAt } } ──
 const resetCodes = new Map();
 
-// ── Helper: upload a base64 or remote URI to Cloudinary ──────────────────────
+// ── Track failed login attempts { email: { count, lockedUntil } } ──
+const loginAttempts = new Map();
+
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCK_TIME = 15 * 60 * 1000; // 15 minutes
+
+// ── Helper: check if account is locked ──
+const isAccountLocked = (email) => {
+  const attempts = loginAttempts.get(email);
+  if (!attempts) return false;
+  if (attempts.lockedUntil && Date.now() < attempts.lockedUntil) return true;
+  if (attempts.lockedUntil && Date.now() >= attempts.lockedUntil) {
+    loginAttempts.delete(email);
+    return false;
+  }
+  return false;
+};
+
+// ── Helper: record failed login attempt ──
+const recordFailedAttempt = (email) => {
+  const attempts = loginAttempts.get(email) || { count: 0, lockedUntil: null };
+  attempts.count += 1;
+  if (attempts.count >= MAX_LOGIN_ATTEMPTS) {
+    attempts.lockedUntil = Date.now() + LOCK_TIME;
+  }
+  loginAttempts.set(email, attempts);
+};
+
+// ── Helper: clear login attempts on success ──
+const clearLoginAttempts = (email) => {
+  loginAttempts.delete(email);
+};
+
+// ── Helper: upload a base64 or remote URI to Cloudinary ──
 const uploadProfilePicToCloudinary = async (dataUri) => {
   const result = await cloudinary.uploader.upload(dataUri, {
     folder: 'student-feedback/profile-pictures',
@@ -29,6 +62,11 @@ exports.register = async (req, res) => {
       });
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ success: false, message: 'Invalid email format' });
+    }
+
     const existingStudentId = await User.findOne({ studentId });
     if (existingStudentId) {
       return res.status(400).json({ success: false, message: 'Student ID already registered' });
@@ -39,22 +77,19 @@ exports.register = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email already registered' });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    // ✅ CHANGED: raised minimum password length from 6 to 8
+    if (password.length < 8) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 8 characters' });
     }
 
-    // ── Profile picture: prefer multer file upload, fall back to base64/URL ──
     let profilePictureUrl = null;
     if (req.file) {
-      // ✅ FIX: multer-storage-cloudinary may store the URL in .path, .secure_url, or .url
       profilePictureUrl = req.file.path || req.file.secure_url || req.file.url || null;
     } else if (profilePicture) {
-      // Came in as JSON (base64 or remote URL e.g. cartoon avatar)
       try {
         profilePictureUrl = await uploadProfilePicToCloudinary(profilePicture);
       } catch (uploadErr) {
         console.error('Profile picture upload failed:', uploadErr.message);
-        // Non-fatal — proceed without picture
       }
     }
 
@@ -93,7 +128,8 @@ exports.register = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error in registration',
-      error: error.message
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -110,9 +146,19 @@ exports.login = async (req, res) => {
       });
     }
 
+    if (isAccountLocked(email.toLowerCase())) {
+      const attempts = loginAttempts.get(email.toLowerCase());
+      const minutesLeft = Math.ceil((attempts.lockedUntil - Date.now()) / 60000);
+      return res.status(429).json({
+        success: false,
+        message: `Too many failed attempts. Try again in ${minutesLeft} minute(s).`
+      });
+    }
+
     const user = await User.findOne({ email }).select('+password');
 
     if (!user) {
+      recordFailedAttempt(email.toLowerCase());
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
@@ -129,11 +175,18 @@ exports.login = async (req, res) => {
     const isPasswordCorrect = await user.comparePassword(password);
 
     if (!isPasswordCorrect) {
+      recordFailedAttempt(email.toLowerCase());
+      const attempts = loginAttempts.get(email.toLowerCase());
+      const remaining = MAX_LOGIN_ATTEMPTS - (attempts?.count || 0);
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: remaining > 0
+          ? `Invalid email or password. ${remaining} attempt(s) remaining.`
+          : 'Account locked for 15 minutes due to too many failed attempts.'
       });
     }
+
+    clearLoginAttempts(email.toLowerCase());
 
     user.lastLogin = new Date();
     await user.save();
@@ -166,7 +219,8 @@ exports.login = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error in login',
-      error: error.message
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -174,7 +228,8 @@ exports.login = async (req, res) => {
 // @desc    Get current user
 exports.getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    // ✅ CHANGED: exclude password field explicitly
+    const user = await User.findById(req.user.id).select('-password');
     res.status(200).json({
       success: true,
       user
@@ -183,7 +238,8 @@ exports.getProfile = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching user data',
-      error: error.message
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -199,12 +255,14 @@ exports.updateProfile = async (req, res) => {
     if (yearLevel) updateFields.yearLevel = yearLevel;
     if (section) updateFields.section = section;
 
-    // ✅ FIX: check req.file first (FormData photo upload via multer)
+    // ✅ ADDED: prevent studentId and role from being updated via this route
+    delete updateFields.studentId;
+    delete updateFields.role;
+    delete updateFields.email;
+
     if (req.file) {
-      // multer-storage-cloudinary already uploaded it — just grab the URL
       updateFields.profilePicture = req.file.path || req.file.secure_url || req.file.url;
     } else if (profilePicture) {
-      // Cartoon avatar URL or base64 sent as JSON
       try {
         updateFields.profilePicture = await uploadProfilePicToCloudinary(profilePicture);
       } catch (uploadErr) {
@@ -216,7 +274,8 @@ exports.updateProfile = async (req, res) => {
       req.user.id,
       updateFields,
       { new: true, runValidators: true }
-    );
+    // ✅ ADDED: exclude password from response
+    ).select('-password');
 
     res.status(200).json({
       success: true,
@@ -227,7 +286,8 @@ exports.updateProfile = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error updating profile',
-      error: error.message
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -244,10 +304,19 @@ exports.changePassword = async (req, res) => {
       });
     }
 
-    if (newPassword.length < 6) {
+    // ✅ CHANGED: raised minimum from 6 to 8
+    if (newPassword.length < 8) {
       return res.status(400).json({
         success: false,
-        message: 'New password must be at least 6 characters'
+        message: 'New password must be at least 8 characters'
+      });
+    }
+
+    // ✅ ADDED: prevent reusing the same password
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be different from current password'
       });
     }
 
@@ -272,7 +341,8 @@ exports.changePassword = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error changing password',
-      error: error.message
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -288,7 +358,7 @@ exports.forgotPassword = async (req, res) => {
 
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      return res.status(404).json({ success: false, message: 'No account found with this email.' });
+      return res.status(200).json({ success: true, message: 'If this email exists, a reset code has been sent.' });
     }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -321,10 +391,15 @@ exports.forgotPassword = async (req, res) => {
       }),
     });
 
-    res.status(200).json({ success: true, message: 'Reset code sent to your email.' });
+    res.status(200).json({ success: true, message: 'If this email exists, a reset code has been sent.' });
   } catch (error) {
     console.error('Forgot password error:', error);
-    res.status(500).json({ success: false, message: 'Failed to send reset code.', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send reset code.',
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -335,6 +410,11 @@ exports.verifyResetCode = async (req, res) => {
     const { email, code } = req.body;
     if (!email || !code) {
       return res.status(400).json({ success: false, message: 'Email and code are required.' });
+    }
+
+    // ✅ ADDED: code must be exactly 6 digits
+    if (!/^\d{6}$/.test(code)) {
+      return res.status(400).json({ success: false, message: 'Invalid code format.' });
     }
 
     const entry = resetCodes.get(email.toLowerCase());
@@ -351,7 +431,12 @@ exports.verifyResetCode = async (req, res) => {
 
     res.status(200).json({ success: true, message: 'Code verified.' });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error verifying code.', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error verifying code.',
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -363,8 +448,15 @@ exports.resetPassword = async (req, res) => {
     if (!email || !code || !newPassword) {
       return res.status(400).json({ success: false, message: 'All fields are required.' });
     }
-    if (newPassword.length < 6) {
-      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
+
+    // ✅ CHANGED: raised minimum from 6 to 8
+    if (newPassword.length < 8) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 8 characters.' });
+    }
+
+    // ✅ ADDED: code must be exactly 6 digits
+    if (!/^\d{6}$/.test(code)) {
+      return res.status(400).json({ success: false, message: 'Invalid code format.' });
     }
 
     const entry = resetCodes.get(email.toLowerCase());
@@ -384,14 +476,20 @@ exports.resetPassword = async (req, res) => {
 
     res.status(200).json({ success: true, message: 'Password reset successfully.' });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error resetting password.', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error resetting password.',
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
 // @desc    Create staff accounts (ADMIN ONLY - REMOVE AFTER USE)
 exports.createStaffAccounts = async (req, res) => {
   try {
-    if (req.query.secret !== process.env.STAFF_CREATION_SECRET) {
+    // ✅ CHANGED: use header instead of query string (query shows in server logs)
+    if (req.headers['x-admin-secret'] !== process.env.STAFF_CREATION_SECRET) {
       return res.status(403).json({ success: false, message: 'Forbidden' });
     }
 
@@ -440,7 +538,8 @@ exports.createStaffAccounts = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error creating staff',
-      error: error.message
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

@@ -22,30 +22,90 @@ const storage = new CloudinaryStorage({
   },
 });
 
+// ── Blocked extensions (double extension attack prevention) ──
+const blockedExtensions = [
+  'php', 'php3', 'php4', 'php5', 'phtml',
+  'exe', 'sh', 'bash', 'bat', 'cmd',
+  'py', 'rb', 'pl', 'cgi',
+  'js', 'jsx', 'ts', 'tsx',
+  'html', 'htm', 'svg',
+  'htaccess', 'htpasswd',
+  'xml', 'xsl',
+];
+
+// ── Allowed mime types ──
+const allowedMimes = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'video/mp4',
+  'video/quicktime',
+  'video/avi',
+];
+
+// ── Allowed mime types for profile (stricter) ──
+const allowedProfileMimes = [
+  'image/jpeg',
+  'image/png',
+];
+
 const fileFilter = (req, file, cb) => {
-  const allowed = [
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'video/mp4',
-    'video/quicktime',
-    'video/avi',
-  ];
-  if (allowed.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only images and videos are allowed'), false);
+  // Check 1: blocked extensions (catches double extension attacks)
+  // e.g. malicious.php.jpg or malicious.php%00.jpg
+  const originalName = file.originalname.toLowerCase();
+  const nameParts = originalName.split('.');
+
+  // Check every part of the filename for blocked extensions
+  const hasBlockedExt = nameParts.some(part => blockedExtensions.includes(part));
+  if (hasBlockedExt) {
+    return cb(new Error('File type not allowed'), false);
   }
+
+  // Check 2: null byte attack prevention
+  // e.g. malicious.php%00.jpg
+  if (file.originalname.includes('\0')) {
+    return cb(new Error('Invalid filename'), false);
+  }
+
+  // Check 3: mime type whitelist
+  if (!allowedMimes.includes(file.mimetype)) {
+    return cb(new Error('Only images and videos are allowed'), false);
+  }
+
+  cb(null, true);
+};
+
+// ── Profile picture filter (stricter — images only) ──
+const profileFileFilter = (req, file, cb) => {
+  // Check 1: blocked extensions
+  const originalName = file.originalname.toLowerCase();
+  const nameParts = originalName.split('.');
+
+  const hasBlockedExt = nameParts.some(part => blockedExtensions.includes(part));
+  if (hasBlockedExt) {
+    return cb(new Error('File type not allowed'), false);
+  }
+
+  // Check 2: null byte attack prevention
+  if (file.originalname.includes('\0')) {
+    return cb(new Error('Invalid filename'), false);
+  }
+
+  // Check 3: images only for profile pictures
+  if (!allowedProfileMimes.includes(file.mimetype)) {
+    return cb(new Error('Only JPG and PNG images are allowed for profile pictures'), false);
+  }
+
+  cb(null, true);
 };
 
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
 });
 
 // ── Profile picture upload ──
-// ✅ FIX: use async params function so public_id generates correctly
 const profileStorage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => ({
@@ -58,7 +118,7 @@ const profileStorage = new CloudinaryStorage({
 
 const uploadProfile = multer({
   storage: profileStorage,
-  fileFilter,
+  fileFilter: profileFileFilter, // ← stricter filter for profile pictures
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 

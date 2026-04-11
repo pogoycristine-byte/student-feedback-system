@@ -16,9 +16,26 @@ exports.protect = async (req, res, next) => {
       });
     }
 
+    // ✅ ADDED: basic token format check before verifying
+    if (typeof token !== 'string' || token.length > 500) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token format'
+      });
+    }
+
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = await User.findById(decoded.id);
+
+      // ✅ ADDED: make sure decoded has an id and it's a valid shape
+      if (!decoded || !decoded.id || typeof decoded.id !== 'string') {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid token payload'
+        });
+      }
+
+      req.user = await User.findById(decoded.id).select('-password'); // ✅ ADDED: never load password into req.user
 
       if (!req.user) {
         return res.status(401).json({
@@ -36,6 +53,13 @@ exports.protect = async (req, res, next) => {
 
       next();
     } catch (error) {
+      // ✅ ADDED: distinguish between expired and invalid tokens
+      if (error.name === 'TokenExpiredError') {
+        return res.status(401).json({
+          success: false,
+          message: 'Token expired, please login again'
+        });
+      }
       return res.status(401).json({
         success: false,
         message: 'Not authorized, token failed'
@@ -54,14 +78,14 @@ exports.authorize = (...roles) => {
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: `User role '${req.user.role}' is not authorized to access this route`
+        // ✅ CHANGED: don't reveal the user's role to the client
+        message: 'You are not authorized to access this route'
       });
     }
     next();
   };
 };
 
-// ← ADD THESE NEW MIDDLEWARE FUNCTIONS
 exports.requireAdmin = (req, res, next) => {
   if (req.user && req.user.role === 'admin') {
     next();

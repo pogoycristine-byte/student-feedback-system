@@ -1,5 +1,5 @@
 const express = require('express');
-const router  = express.Router();
+const router = express.Router();
 const {
   getStaffList,
   getThreads,
@@ -8,23 +8,24 @@ const {
   markAsRead,
 } = require('../controllers/messageController');
 const { protect } = require('../middleware/auth');
+const rateLimit = require('express-rate-limit'); // ✅ ADDED
+
+// ✅ ADDED: limit message sending to prevent flooding
+const messageLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 30,
+  message: { success: false, message: 'Too many messages sent, please slow down.' }
+});
 
 // All routes require a valid JWT
 router.use(protect);
 
-// GET  /api/messages/staff                    — list staff to message (admin)
 router.get('/staff', getStaffList);
-
-// GET  /api/messages/threads                  — all threads for current user
 router.get('/threads', getThreads);
-
-// GET  /api/messages/:threadId                — messages inside a thread
 router.get('/:threadId', getMessages);
-
-// PUT  /api/messages/:threadId/read           — mark thread as read for current user
 router.put('/:threadId/read', markAsRead);
 
-// POST /api/messages/:recipientIdOrThreadId   — send (creates thread if new)
-router.post('/:recipientIdOrThreadId', sendMessage);
+// ✅ ADDED: messageLimiter on send only
+router.post('/:recipientIdOrThreadId', messageLimiter, sendMessage);
 
 module.exports = router;

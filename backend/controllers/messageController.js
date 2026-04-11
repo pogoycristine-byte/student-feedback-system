@@ -2,8 +2,18 @@ const Message      = require('../models/Message');
 const User         = require('../models/User');
 const Notification = require('../models/Notification');
 
+// ✅ ADDED: sanitizer to prevent XSS in messages
+const sanitizeString = (str) => {
+  if (!str) return str;
+  return str
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+};
+
 // GET /api/messages/staff
-// Admin only — returns all staff/admin users except self (to start new DMs)
 exports.getStaffList = async (req, res) => {
   try {
     const staff = await User.find({
@@ -21,8 +31,6 @@ exports.getStaffList = async (req, res) => {
 };
 
 // GET /api/messages/threads
-// Returns all DM threads the current user is part of, newest first.
-// Each thread includes lastMessage and isUnread (for the current user).
 exports.getThreads = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -36,7 +44,6 @@ exports.getThreads = async (req, res) => {
         ? t.messages[t.messages.length - 1]
         : null;
 
-      // Find this user's read pointer in lastReadBy
       const myRead = t.lastReadBy?.find(
         (r) => r.userId.toString() === userId.toString()
       );
@@ -46,10 +53,8 @@ exports.getThreads = async (req, res) => {
         const sentByMe = lastMessage.sender.toString() === userId.toString();
         if (!sentByMe) {
           if (!myRead) {
-            // Never read this thread at all
             isUnread = true;
           } else {
-            // Unread if the last message is newer than what we last read
             isUnread = myRead.messageId.toString() !== lastMessage._id.toString();
           }
         }
@@ -72,7 +77,6 @@ exports.getThreads = async (req, res) => {
 };
 
 // GET /api/messages/:threadId
-// Returns all messages inside a thread (must be a participant)
 exports.getMessages = async (req, res) => {
   try {
     const thread = await Message.findOne({
@@ -90,7 +94,6 @@ exports.getMessages = async (req, res) => {
 };
 
 // PUT /api/messages/:threadId/read
-// Marks the thread as read for the current user (upserts lastReadBy entry)
 exports.markAsRead = async (req, res) => {
   try {
     const userId   = req.user._id;
@@ -106,7 +109,6 @@ exports.markAsRead = async (req, res) => {
 
     const lastMessageId = thread.messages[thread.messages.length - 1]._id;
 
-    // Upsert: update existing entry or push a new one
     const existing = thread.lastReadBy?.find(
       (r) => r.userId.toString() === userId.toString()
     );
@@ -126,7 +128,6 @@ exports.markAsRead = async (req, res) => {
 };
 
 // POST /api/messages/:recipientIdOrThreadId
-// Send a message. Param can be an existing threadId OR a userId (creates thread if new)
 exports.sendMessage = async (req, res) => {
   try {
     const { recipientIdOrThreadId } = req.params;
@@ -137,18 +138,26 @@ exports.sendMessage = async (req, res) => {
       return res.status(400).json({ message: 'Message cannot be empty' });
     }
 
+    // ✅ ADDED: message length limit
+    if (message.trim().length > 2000) {
+      return res.status(400).json({ message: 'Message must be under 2000 characters' });
+    }
+
     let thread = null;
 
-    // 1. Try to find existing thread by _id where user is participant
     thread = await Message.findOne({
       _id:          recipientIdOrThreadId,
       participants: senderId,
     });
 
-    // 2. Not a threadId — treat as recipientId, find or create thread
     if (!thread) {
       const recipient = await User.findById(recipientIdOrThreadId);
       if (!recipient) return res.status(404).json({ message: 'Recipient not found' });
+
+      // ✅ ADDED: only allow messaging staff or admin (not students)
+      if (recipient.role === 'student') {
+        return res.status(403).json({ message: 'You can only message staff or admin' });
+      }
 
       thread = await Message.findOne({
         participants: { $all: [senderId, recipient._id], $size: 2 },
@@ -167,11 +176,11 @@ exports.sendMessage = async (req, res) => {
       sender:     senderId,
       senderName: req.user.name,
       senderRole: req.user.role,
-      message:    message.trim(),
+      // ✅ ADDED: sanitize message before saving to prevent XSS
+      message:    sanitizeString(message.trim()),
     });
     thread.updatedAt = new Date();
 
-    // Sender has implicitly read up to this message
     const newMsg    = thread.messages[thread.messages.length - 1];
     const myRead    = thread.lastReadBy?.find(
       (r) => r.userId.toString() === senderId.toString()
@@ -184,7 +193,6 @@ exports.sendMessage = async (req, res) => {
 
     await thread.save();
 
-    // ── DM Notification ──────────────────────────────────────────
     try {
       await thread.populate('participants', 'name role');
 
@@ -211,7 +219,6 @@ exports.sendMessage = async (req, res) => {
     } catch (notifErr) {
       console.error('DM notification error:', notifErr);
     }
-    // ─────────────────────────────────────────────────────────────
 
     const saved = thread.messages[thread.messages.length - 1];
     res.status(201).json({ message: saved, threadId: thread._id });

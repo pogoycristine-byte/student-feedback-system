@@ -4,41 +4,66 @@ const { protect, requireAdmin } = require('../middleware/auth');
 const authController = require('../controllers/authController');
 const { uploadProfile } = require('../middleware/upload');
 const User = require('../models/User');
+const rateLimit = require('express-rate-limit'); // ✅ ADDED
+
+// ✅ ADDED: strict limiter for sensitive routes
+const strictLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { success: false, message: 'Too many attempts, please try again later.' }
+});
+
+// ✅ ADDED: limiter for forgot password to prevent email spam
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  message: { success: false, message: 'Too many password reset attempts, please try again in an hour.' }
+});
+
+// ✅ ADDED: heartbeat has its own loose limiter (called frequently)
+const heartbeatLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 10,
+  message: { success: false, message: 'Too many heartbeat requests.' }
+});
 
 // @route   POST /api/auth/register
-router.post('/register', uploadProfile.single('profilePicture'), authController.register);
+// ✅ ADDED: strictLimiter to prevent mass account creation
+router.post('/register', strictLimiter, uploadProfile.single('profilePicture'), authController.register);
 
 // @route   POST /api/auth/login
-router.post('/login', authController.login);
+// ✅ ADDED: strictLimiter (you already have authLimiter in server.js, this adds per-route protection too)
+router.post('/login', strictLimiter, authController.login);
 
 // @route   GET /api/auth/me
 router.get('/me', protect, authController.getProfile);
 
 // @route   PUT /api/auth/update-profile
-// ✅ UPDATED: now accepts multipart/form-data for photo uploads
 router.put('/update-profile', protect, uploadProfile.single('profilePicture'), authController.updateProfile);
 
 // @route   PUT /api/auth/change-password
-router.put('/change-password', protect, authController.changePassword);
+// ✅ ADDED: strictLimiter to prevent brute force password changes
+router.put('/change-password', protect, strictLimiter, authController.changePassword);
 
-// ── NEW: Forgot password routes (no auth required) ──
-router.post('/forgot-password',    authController.forgotPassword);
-router.post('/verify-reset-code',  authController.verifyResetCode);
-router.post('/reset-password',     authController.resetPassword);
+// ── Forgot password routes ──
+// ✅ ADDED: forgotPasswordLimiter to prevent email bombing
+router.post('/forgot-password',   forgotPasswordLimiter, authController.forgotPassword);
+router.post('/verify-reset-code', forgotPasswordLimiter, authController.verifyResetCode);
+router.post('/reset-password',    forgotPasswordLimiter, authController.resetPassword);
 
-// ── NEW: Heartbeat — updates lastSeen so admin panel shows live online status ──
-// @route   PUT /api/auth/heartbeat
-router.put('/heartbeat', protect, async (req, res) => {
+// ── Heartbeat ──
+router.put('/heartbeat', protect, heartbeatLimiter, async (req, res) => { // ✅ ADDED: heartbeatLimiter
   try {
     await User.findByIdAndUpdate(req.user._id, { lastSeen: new Date() });
     res.json({ success: true });
   } catch (error) {
-    console.error('Heartbeat error:', error);
+    // ✅ CHANGED: don't log full error in production
+    if (process.env.NODE_ENV === 'development') console.error('Heartbeat error:', error);
     res.status(500).json({ success: false, message: 'Heartbeat failed' });
   }
 });
 
-// CREATE STAFF ACCOUNT (Admin only)
+// ── Create Staff (Admin only) ──
 router.post('/create-staff', protect, requireAdmin, async (req, res) => {
   try {
     const { name, email, password, studentId } = req.body;
@@ -47,6 +72,31 @@ router.post('/create-staff', protect, requireAdmin, async (req, res) => {
       return res.status(400).json({ 
         success: false,
         message: 'Please provide all required fields: name, email, password, studentId' 
+      });
+    }
+
+    // ✅ ADDED: input length limits to prevent oversized payloads slipping through
+    if (name.length > 50 || email.length > 100 || password.length > 128 || studentId.length > 30) {
+      return res.status(400).json({
+        success: false,
+        message: 'One or more fields exceed the maximum allowed length'
+      });
+    }
+
+    // ✅ ADDED: basic email format check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email format'
+      });
+    }
+
+    // ✅ ADDED: minimum password strength
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 8 characters'
       });
     }
 
@@ -86,11 +136,12 @@ router.post('/create-staff', protect, requireAdmin, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Create staff error:', error);
+    // ✅ CHANGED: hide error.message in production
+    if (process.env.NODE_ENV === 'development') console.error('Create staff error:', error);
     res.status(500).json({ 
       success: false,
-      message: 'Server error', 
-      error: error.message 
+      message: 'Server error'
+      // ✅ REMOVED: error.message was exposed here before
     });
   }
 });

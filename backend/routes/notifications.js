@@ -2,14 +2,24 @@ const express = require('express');
 const router = express.Router();
 const { protect, requireAdminOrStaff } = require('../middleware/auth');
 const Notification = require('../models/Notification');
+const rateLimit = require('express-rate-limit'); // ✅ ADDED
+
+// ✅ ADDED: prevent notification spam clicking
+const notificationLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 60,
+  message: { success: false, message: 'Too many requests' }
+});
+
+router.use(notificationLimiter); // ✅ ADDED: apply to all notification routes
 
 // GET /api/notifications
 router.get('/', protect, requireAdminOrStaff, async (req, res) => {
   try {
     const notifications = await Notification.find({
       $or: [
-        { targetRoles: req.user.role, targetUserId: null },  // ← role-wide (feedback notifs)
-        { targetUserId: req.user._id },                       // ← DM notifs — only for me
+        { targetRoles: req.user.role, targetUserId: null },
+        { targetUserId: req.user._id },
       ]
     })
       .sort({ createdAt: -1 })
@@ -30,7 +40,7 @@ router.get('/', protect, requireAdminOrStaff, async (req, res) => {
   }
 });
 
-// PUT /api/notifications/read-all — MUST be before /:id
+// PUT /api/notifications/read-all
 router.put('/read-all', protect, requireAdminOrStaff, async (req, res) => {
   try {
     await Notification.updateMany(
@@ -61,7 +71,7 @@ router.put('/:id/read', protect, requireAdminOrStaff, async (req, res) => {
   }
 });
 
-// DELETE /api/notifications/clear-all — MUST be before /:id
+// DELETE /api/notifications/clear-all
 router.delete('/clear-all', protect, requireAdminOrStaff, async (req, res) => {
   try {
     await Notification.deleteMany({

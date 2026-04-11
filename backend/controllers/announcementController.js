@@ -1,6 +1,12 @@
 const Announcement = require('../models/Announcement');
 
-// GET /api/announcements — all active (students + staff)
+// ✅ ADDED: length limits for announcement fields
+const LIMITS = {
+  title: 200,
+  message: 5000,
+};
+
+// GET /api/announcements
 exports.getAnnouncements = async (req, res) => {
   try {
     const announcements = await Announcement.find({ isActive: true })
@@ -8,11 +14,16 @@ exports.getAnnouncements = async (req, res) => {
       .sort({ createdAt: -1 });
     res.json({ success: true, announcements });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
-// GET /api/announcements/all — all including inactive (admin only)
+// GET /api/announcements/all
 exports.getAllAnnouncements = async (req, res) => {
   try {
     const announcements = await Announcement.find()
@@ -20,11 +31,16 @@ exports.getAllAnnouncements = async (req, res) => {
       .sort({ createdAt: -1 });
     res.json({ success: true, announcements });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
-// GET /api/announcements/my — active announcements + own hidden ones (staff)
+// GET /api/announcements/my
 exports.getMyAnnouncements = async (req, res) => {
   try {
     const announcements = await Announcement.find({
@@ -37,17 +53,31 @@ exports.getMyAnnouncements = async (req, res) => {
       .sort({ createdAt: -1 });
     res.json({ success: true, announcements });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
-// POST /api/announcements — create (admin or staff)
+// POST /api/announcements
 exports.createAnnouncement = async (req, res) => {
   try {
     const { title, message } = req.body;
     if (!title || !message) {
       return res.status(400).json({ success: false, message: 'Title and message are required' });
     }
+
+    // ✅ ADDED: length validation
+    if (title.trim().length > LIMITS.title) {
+      return res.status(400).json({ success: false, message: `Title must be under ${LIMITS.title} characters` });
+    }
+    if (message.trim().length > LIMITS.message) {
+      return res.status(400).json({ success: false, message: `Message must be under ${LIMITS.message} characters` });
+    }
+
     const announcement = await Announcement.create({
       title: title.trim(),
       message: message.trim(),
@@ -56,11 +86,16 @@ exports.createAnnouncement = async (req, res) => {
     await announcement.populate('createdBy', 'name role');
     res.status(201).json({ success: true, announcement });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
-// PUT /api/announcements/:id — edit (admin any, staff only their own)
+// PUT /api/announcements/:id
 exports.updateAnnouncement = async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id);
@@ -71,6 +106,15 @@ exports.updateAnnouncement = async (req, res) => {
     }
 
     const { title, message, isActive } = req.body;
+
+    // ✅ ADDED: length validation on update
+    if (title && title.trim().length > LIMITS.title) {
+      return res.status(400).json({ success: false, message: `Title must be under ${LIMITS.title} characters` });
+    }
+    if (message && message.trim().length > LIMITS.message) {
+      return res.status(400).json({ success: false, message: `Message must be under ${LIMITS.message} characters` });
+    }
+
     const updated = await Announcement.findByIdAndUpdate(
       req.params.id,
       { ...(title && { title: title.trim() }), ...(message && { message: message.trim() }), ...(isActive !== undefined && { isActive }) },
@@ -78,11 +122,16 @@ exports.updateAnnouncement = async (req, res) => {
     ).populate('createdBy', 'name role');
     res.json({ success: true, announcement: updated });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
-// DELETE /api/announcements/:id — delete (admin any, staff only their own)
+// DELETE /api/announcements/:id
 exports.deleteAnnouncement = async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id);
@@ -95,6 +144,11 @@ exports.deleteAnnouncement = async (req, res) => {
     await Announcement.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: 'Announcement deleted' });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };

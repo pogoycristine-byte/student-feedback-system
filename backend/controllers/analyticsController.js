@@ -133,7 +133,8 @@ exports.getDashboard = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching analytics',
-      error: error.message
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -142,6 +143,15 @@ exports.getDashboard = async (req, res) => {
 exports.getTrends = async (req, res) => {
   try {
     const { period = '30' } = req.query;
+
+    // ✅ ADDED: whitelist allowed period values — prevents passing huge numbers or non-numeric values
+    const allowedPeriods = ['7', '14', '30', '60', '90'];
+    if (!allowedPeriods.includes(period)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid period. Allowed values: 7, 14, 30, 60, 90'
+      });
+    }
 
     const daysAgo = new Date(Date.now() - parseInt(period) * 24 * 60 * 60 * 1000);
 
@@ -171,7 +181,8 @@ exports.getTrends = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching trends',
-      error: error.message
+      // ✅ CHANGED: hide error details in production
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
