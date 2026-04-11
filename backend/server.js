@@ -5,7 +5,7 @@ const dotenv = require('dotenv');
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
-const hpp = require('hpp'); // ✅ ADDED
+const hpp = require('hpp');
 const rateLimit = require('express-rate-limit');
 const cron = require('node-cron');
 
@@ -16,16 +16,30 @@ const app = express();
 // ── Security Middleware (before everything) ──
 app.use(helmet());
 
+// ── CORS: allow specific trusted origins only ──
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:3000',
+  'http://localhost:3001',
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL,
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
 
-app.use(mongoSanitize()); // blocks MongoDB injection
-app.use(xss());           // blocks XSS attacks
-app.use(hpp());           // ✅ ADDED: blocks HTTP Parameter Pollution attacks
+app.use(mongoSanitize());
+app.use(xss());
+app.use(hpp());
 
 // ✅ MOVED: health check before rate limiter so Render's pings don't get 429'd and crash the server
 app.get('/', (req, res) => {
@@ -52,7 +66,6 @@ const authLimiter = rateLimit({
 app.use(globalLimiter);
 
 // ── Body Parsers ──
-// ✅ CHANGED: reduced from 10mb to 50kb — files go through Cloudinary, JSON doesn't need 10mb
 app.use(express.json({ limit: '50kb' }));
 app.use(express.urlencoded({ extended: true, limit: '50kb' }));
 
