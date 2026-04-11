@@ -2,15 +2,49 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
+const rateLimit = require('express-rate-limit');
+const cron = require('node-cron');
 
 dotenv.config();
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// ── Security Middleware (before everything) ──
+app.use(helmet());
 
+app.use(cors({
+  origin: process.env.FRONTEND_URL,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}));
+
+app.use(mongoSanitize()); // blocks MongoDB injection
+app.use(xss());           // blocks XSS attacks
+
+// ── Rate Limiters ──
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
+  message: { success: false, message: 'Too many requests, please try again later.' }
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // stricter for login/auth
+  message: { success: false, message: 'Too many login attempts, please try again later.' }
+});
+
+app.use(globalLimiter);
+
+// ── Body Parsers ──
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ── Database ──
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -18,6 +52,7 @@ mongoose.connect(process.env.MONGODB_URI, {
 .then(() => console.log('✅ MongoDB Connected Successfully'))
 .catch((err) => console.error('❌ MongoDB Connection Error:', err));
 
+// ── Routes ──
 const authRoutes          = require('./routes/auth');
 const feedbackRoutes      = require('./routes/feedback');
 const categoryRoutes      = require('./routes/category');
@@ -27,7 +62,7 @@ const announcementRoutes  = require('./routes/announcements');
 const messageRoutes       = require('./routes/messages');
 const notificationRoutes  = require('./routes/notifications'); // ✅ NEW
 
-app.use('/api/auth',          authRoutes);
+app.use('/api/auth',          authLimiter, authRoutes);  // stricter limit on auth
 app.use('/api/feedback',      feedbackRoutes);
 app.use('/api/categories',    categoryRoutes);
 app.use('/api/users',         userRoutes);
@@ -44,6 +79,7 @@ app.get('/', (req, res) => {
   });
 });
 
+// ── 404 Handler ──
 app.use((req, res) => {
   res.status(404).json({ 
     success: false, 
@@ -51,7 +87,7 @@ app.use((req, res) => {
   });
 });
 
-// Multer/upload error handler
+// ── Multer/upload error handler ──
 app.use((err, req, res, next) => {
   console.error('❌ Upload/Multer error:', err.message);
 
@@ -72,7 +108,7 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-// General error handler
+// ── General error handler ──
 app.use((err, req, res, next) => {
   console.error('❌ Server error:', err.stack);
   res.status(500).json({ 
@@ -82,7 +118,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ✅ NEW: Overdue feedback checker — runs every 10 minutes
+// ── Overdue feedback checker — replaced setInterval with node-cron ──
 const Feedback = require('./models/Feedback');
 const { createNotification } = require('./utils/notificationHelper');
 
@@ -110,7 +146,8 @@ const checkOverdueFeedback = async () => {
   }
 };
 
-setInterval(checkOverdueFeedback, 10 * 60 * 1000); // ✅ every 10 minutes
+// ✅ Replaced setInterval with node-cron (more reliable)
+cron.schedule('*/10 * * * *', checkOverdueFeedback);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
