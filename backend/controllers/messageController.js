@@ -1,6 +1,6 @@
 const Message      = require('../models/Message');
 const User         = require('../models/User');
-const Notification = require('../models/Notification'); // ← added
+const Notification = require('../models/Notification');
 
 // GET /api/messages/staff
 // Admin only — returns all staff/admin users except self (to start new DMs)
@@ -21,7 +21,8 @@ exports.getStaffList = async (req, res) => {
 };
 
 // GET /api/messages/threads
-// Returns all DM threads the current user is part of, newest first
+// Returns all DM threads the current user is part of, newest first.
+// Each thread includes lastMessage and isUnread (for the current user).
 exports.getThreads = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -30,13 +31,38 @@ exports.getThreads = async (req, res) => {
       .populate('participants', 'name email role')
       .sort({ updatedAt: -1 });
 
-    // Shape response: attach lastMessage for sidebar preview
-    const shaped = threads.map((t) => ({
-      _id:          t._id,
-      participants: t.participants,
-      lastMessage:  t.messages.length ? t.messages[t.messages.length - 1] : null,
-      updatedAt:    t.updatedAt,
-    }));
+    const shaped = threads.map((t) => {
+      const lastMessage = t.messages.length
+        ? t.messages[t.messages.length - 1]
+        : null;
+
+      // Find this user's read pointer in lastReadBy
+      const myRead = t.lastReadBy?.find(
+        (r) => r.userId.toString() === userId.toString()
+      );
+
+      let isUnread = false;
+      if (lastMessage) {
+        const sentByMe = lastMessage.sender.toString() === userId.toString();
+        if (!sentByMe) {
+          if (!myRead) {
+            // Never read this thread at all
+            isUnread = true;
+          } else {
+            // Unread if the last message is newer than what we last read
+            isUnread = myRead.messageId.toString() !== lastMessage._id.toString();
+          }
+        }
+      }
+
+      return {
+        _id:          t._id,
+        participants: t.participants,
+        lastMessage,
+        isUnread,
+        updatedAt:    t.updatedAt,
+      };
+    });
 
     res.json({ threads: shaped });
   } catch (err) {
@@ -59,6 +85,42 @@ exports.getMessages = async (req, res) => {
     res.json({ messages: thread.messages, participants: thread.participants });
   } catch (err) {
     console.error('getMessages:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// PUT /api/messages/:threadId/read
+// Marks the thread as read for the current user (upserts lastReadBy entry)
+exports.markAsRead = async (req, res) => {
+  try {
+    const userId   = req.user._id;
+    const threadId = req.params.threadId;
+
+    const thread = await Message.findOne({
+      _id:          threadId,
+      participants: userId,
+    });
+
+    if (!thread) return res.status(404).json({ message: 'Thread not found' });
+    if (!thread.messages.length) return res.json({ success: true });
+
+    const lastMessageId = thread.messages[thread.messages.length - 1]._id;
+
+    // Upsert: update existing entry or push a new one
+    const existing = thread.lastReadBy?.find(
+      (r) => r.userId.toString() === userId.toString()
+    );
+
+    if (existing) {
+      existing.messageId = lastMessageId;
+    } else {
+      thread.lastReadBy.push({ userId, messageId: lastMessageId });
+    }
+
+    await thread.save();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('markAsRead:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -96,6 +158,7 @@ exports.sendMessage = async (req, res) => {
         thread = new Message({
           participants: [senderId, recipient._id],
           messages:     [],
+          lastReadBy:   [],
         });
       }
     }
@@ -107,6 +170,18 @@ exports.sendMessage = async (req, res) => {
       message:    message.trim(),
     });
     thread.updatedAt = new Date();
+
+    // Sender has implicitly read up to this message
+    const newMsg    = thread.messages[thread.messages.length - 1];
+    const myRead    = thread.lastReadBy?.find(
+      (r) => r.userId.toString() === senderId.toString()
+    );
+    if (myRead) {
+      myRead.messageId = newMsg._id;
+    } else {
+      thread.lastReadBy.push({ userId: senderId, messageId: newMsg._id });
+    }
+
     await thread.save();
 
     // ── DM Notification ──────────────────────────────────────────

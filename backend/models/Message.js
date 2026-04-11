@@ -24,6 +24,14 @@ const messageThreadSchema = new mongoose.Schema(
       },
     ],
     messages: [messageItemSchema],
+    // Tracks the last message each participant has read
+    // { userId: ObjectId, messageId: ObjectId }
+    lastReadBy: [
+      {
+        userId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        messageId: { type: mongoose.Schema.Types.ObjectId, required: true },
+      },
+    ],
   },
   { timestamps: true }
 );
