@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -131,15 +131,25 @@ const injectStyles = () => {
     .sb-scrollbar::-webkit-scrollbar { width: 3px; }
     .sb-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .sb-scrollbar::-webkit-scrollbar-thumb { background: rgba(167,139,250,0.2); border-radius: 99px; }
+    .sb-bell-wrap {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .sb-bell-wrap.ready {
+      opacity: 1;
+      pointer-events: auto;
+      transition: opacity 0.25s ease;
+    }
   `;
   document.head.appendChild(style);
 };
 injectStyles();
 
-/* ─── Persistence helpers (unchanged) ───────────────────────────────────── */
+/* ─── Persistence helpers (feedback chat — unchanged) ────────────────────── */
 const DISMISSED_KEY = 'dismissedNewFeedback';
-const getDismissed = () => {
-  try { return new Set(JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]')); }
+const getDismissedKey = (userId) => `${DISMISSED_KEY}_${userId}`;
+const getDismissed = (userId) => {
+  try { return new Set(JSON.parse(localStorage.getItem(getDismissedKey(userId)) || '[]')); }
   catch { return new Set(); }
 };
 
@@ -155,17 +165,10 @@ export const markChatAsRead = (feedbackId, lastMessageId) => {
   window.dispatchEvent(new Event('adminReadChat'));
 };
 
-const DM_LAST_READ_KEY = 'adminLastReadDmId';
-export const getDmLastRead = () => {
-  try { return JSON.parse(localStorage.getItem(DM_LAST_READ_KEY) || '{}'); }
-  catch { return {}; }
-};
-export const markDmAsRead = (threadId, lastMessageId) => {
-  const map = getDmLastRead();
-  map[threadId] = lastMessageId;
-  localStorage.setItem(DM_LAST_READ_KEY, JSON.stringify(map));
-  window.dispatchEvent(new Event('adminReadDm'));
-};
+// These are kept as no-ops so existing imports in MessagesPage don't break,
+// but DM read state is now tracked entirely in the backend.
+export const getDmLastRead = () => ({});
+export const markDmAsRead  = () => {};
 
 const getDueStatus = (item) => {
   if (item.status === 'Resolved' || item.status === 'Rejected') return null;
@@ -238,7 +241,6 @@ const Logo = () => (
   </div>
 );
 
-/* ─── Toggle switch ──────────────────────────────────────────────────────── */
 const Toggle = ({ on }) => (
   <div style={{
     marginLeft: 'auto',
@@ -268,12 +270,17 @@ const Sidebar = () => {
   const { logout, user } = useAuth();
   const location = useLocation();
 
-  // ── Bell position per page — adjust top/right independently per route ──
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
+
+  // authController returns { id, name, role, ... } — NOT _id.
+  const userId = String(user?.id || user?._id || '');
+
   const bellPosition = {
     '/dashboard':    { top: '38px', right: '281px' },
     '/announcements':{ top: '38px', right: '395px'  },
     '/messages':     { top: '24px', right: '24px'  },
-    '/feedback':     { top: '48px', right: '200px'  },
+    '/feedback':     { top: '48px', right: '220px'  },
     '/categories':   { top: '46px', right: '360px'  },
     '/students':     { top: '42px', right: '454px'  },
     '/reports':      { top: '46px', right: '160px'  },
@@ -283,15 +290,24 @@ const Sidebar = () => {
   };
   const currentBell = bellPosition[location.pathname] || { top: '24px', right: '24px' };
 
+  const [bellReady, setBellReady] = useState(false);
+  useEffect(() => {
+    setBellReady(false);
+    const raf1 = requestAnimationFrame(() => {
+      const raf2 = requestAnimationFrame(() => setBellReady(true));
+      return () => cancelAnimationFrame(raf2);
+    });
+    return () => cancelAnimationFrame(raf1);
+  }, [location.pathname]);
+
   const [newFeedbackCount, setNewFeedbackCount] = useState(0);
-  const [unreadChatCount, setUnreadChatCount] = useState(0);
-  const [dueSoonCount, setDueSoonCount] = useState(0);
-  const [overdueCount, setOverdueCount] = useState(0);
-  const [unreadDmCount, setUnreadDmCount] = useState(0);
+  const [unreadChatCount, setUnreadChatCount]   = useState(0);
+  const [dueSoonCount, setDueSoonCount]         = useState(0);
+  const [overdueCount, setOverdueCount]         = useState(0);
+  const [unreadDmCount, setUnreadDmCount]       = useState(0);
 
   const isAdmin = user?.role === 'admin';
   const [lightMode, setLightMode] = useState(
-    
     () => document.documentElement.classList.contains('light-mode') || document.body.classList.contains('light-mode')
   );
 
@@ -318,29 +334,25 @@ const Sidebar = () => {
     setDueSoonCount(count);
   };
 
+  // ── DM unread count ──
+  // Now fully backend-driven: getThreads returns isUnread per thread.
   const computeDmCount = async () => {
+    if (!userRef.current?.name) return;
     try {
-      const res = await messagesAPI.getThreads();
+      const res     = await messagesAPI.getThreads();
       const threads = res.data.threads || [];
-      const lastRead = getDmLastRead();
-      let count = 0;
-      threads.forEach(thread => {
-        const lastMsg = thread.lastMessage;
-        if (!lastMsg) return;
-        const sentByMe = lastMsg.senderName === user?.name;
-        if (!sentByMe && lastRead[thread._id] !== lastMsg._id) count++;
-      });
+      const count   = threads.filter(t => t.isUnread).length;
       setUnreadDmCount(count);
     } catch {}
   };
 
   const computeCounts = async () => {
     try {
-      const response = await feedbackAPI.getAll({});
+      const response    = await feedbackAPI.getAll({});
       const allFeedback = response.data.feedback || [];
-      const dismissed = getDismissed();
-      const lastRead = getLastRead();
-      const now = new Date();
+      const dismissed   = getDismissed(userId);
+      const lastRead    = getLastRead();
+      const now         = new Date();
 
       const newCount = allFeedback.filter(item => {
         if (dismissed.has(item._id)) return false;
@@ -352,7 +364,7 @@ const Sidebar = () => {
       await Promise.all(
         allFeedback.map(async (item) => {
           try {
-            const msgRes = await feedbackAPI.getMessages(item._id);
+            const msgRes   = await feedbackAPI.getMessages(item._id);
             const messages = msgRes.data.messages || [];
             if (messages.length === 0) return;
             const lastMsg = messages[messages.length - 1];
@@ -376,32 +388,39 @@ const Sidebar = () => {
     }
   };
 
+  // ── Effect 1: polling + event listeners (registered once) ──
   useEffect(() => {
-    computeCounts();
-    computeScheduleBadge();
-    computeDmCount();
-
     const interval = setInterval(() => {
       computeCounts();
       computeScheduleBadge();
       computeDmCount();
-    }, 30000);
+    }, 15000);
 
     window.addEventListener('feedbackDismissed', computeCounts);
-    window.addEventListener('adminReadChat', computeCounts);
-    window.addEventListener('schedulesUpdated', computeScheduleBadge);
-    window.addEventListener('adminReadDm', computeDmCount);
-    window.addEventListener('dmSent', computeDmCount);
+    window.addEventListener('adminReadChat',     computeCounts);
+    window.addEventListener('schedulesUpdated',  computeScheduleBadge);
+    window.addEventListener('adminReadDm',       computeDmCount);
+    window.addEventListener('dmSent',            computeDmCount);
+    window.addEventListener('newDmReceived',     computeDmCount);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('feedbackDismissed', computeCounts);
-      window.removeEventListener('adminReadChat', computeCounts);
-      window.removeEventListener('schedulesUpdated', computeScheduleBadge);
-      window.removeEventListener('adminReadDm', computeDmCount);
-      window.removeEventListener('dmSent', computeDmCount);
+      window.removeEventListener('adminReadChat',     computeCounts);
+      window.removeEventListener('schedulesUpdated',  computeScheduleBadge);
+      window.removeEventListener('adminReadDm',       computeDmCount);
+      window.removeEventListener('dmSent',            computeDmCount);
+      window.removeEventListener('newDmReceived',     computeDmCount);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Effect 2: initial load once userId is known ──
+  useEffect(() => {
+    if (!userId) return;
+    computeCounts();
+    computeScheduleBadge();
+    computeDmCount();
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalBadge = newFeedbackCount + unreadChatCount;
 
@@ -409,17 +428,17 @@ const Sidebar = () => {
     {
       label: 'Overview',
       items: [
-        { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+        { name: 'Dashboard',     path: '/dashboard',     icon: LayoutDashboard },
         { name: 'Announcements', path: '/announcements', icon: Megaphone },
-        { name: 'Messages', path: '/messages', icon: MessagesSquare, badge: unreadDmCount },
+        { name: 'Messages',      path: '/messages',      icon: MessagesSquare, badge: unreadDmCount },
       ],
     },
     {
       label: 'Management',
       items: [
-        { name: 'Manage Feedback', path: '/feedback', icon: MessageSquare, badge: totalBadge, overdueBadge: overdueCount },
-        { name: 'Manage Categories', path: '/categories', icon: FolderOpen },
-        { name: 'Manage Users', path: '/students', icon: Users },
+        { name: 'Manage Feedback',    path: '/feedback',   icon: MessageSquare, badge: totalBadge, overdueBadge: overdueCount },
+        { name: 'Manage Categories',  path: '/categories', icon: FolderOpen },
+        { name: 'Manage Users',       path: '/students',   icon: Users },
       ],
     },
     {
@@ -440,15 +459,15 @@ const Sidebar = () => {
     {
       label: 'Overview',
       items: [
-        { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+        { name: 'Dashboard',     path: '/dashboard',     icon: LayoutDashboard },
         { name: 'Announcements', path: '/announcements', icon: Megaphone },
-        { name: 'Messages', path: '/messages', icon: MessagesSquare, badge: unreadDmCount },
+        { name: 'Messages',      path: '/messages',      icon: MessagesSquare, badge: unreadDmCount },
       ],
     },
     {
       label: 'Feedback',
       items: [
-        { name: 'Feedback', path: '/feedback', icon: MessageSquare, badge: totalBadge, overdueBadge: overdueCount },
+        { name: 'Feedback',        path: '/feedback',     icon: MessageSquare, badge: totalBadge, overdueBadge: overdueCount },
         { name: 'Manage Feedback', path: '/staff/manage', icon: ClipboardList },
       ],
     },
@@ -456,6 +475,13 @@ const Sidebar = () => {
       label: 'Schedule',
       items: [
         { name: 'My Schedules', path: '/schedules', icon: CalendarClock, badge: dueSoonCount },
+      ],
+    },
+    // ── added: staff can access Settings (limited view handled in SystemSettings) ──
+    {
+      label: 'Settings',
+      items: [
+        { name: 'Settings', path: '/settings', icon: Settings },
       ],
     },
   ];
@@ -506,8 +532,6 @@ const Sidebar = () => {
       }}>
         <Logo />
         <div style={{ borderTop: '1px solid rgba(167,139,250,0.12)', margin: '14px 0 10px' }} />
-
-        {/* Panel title + user (bell removed from here) */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <p style={{
@@ -591,17 +615,19 @@ const Sidebar = () => {
         </button>
       </div>
 
-      {/* ── Fixed Notification Bell (top-right, visible on all pages) ── */}
-      <div style={{
-        position: 'fixed',
-        top: currentBell.top,
-        right: currentBell.right,
-        zIndex: 9999,
-        transition: 'right 0.2s ease, top 0.2s ease',
-      }}>
+      {/* ── Fixed Notification Bell ── */}
+      <div
+        className={`sb-bell-wrap${bellReady ? ' ready' : ''}`}
+        style={{
+          position: 'fixed',
+          top: currentBell.top,
+          right: currentBell.right,
+          zIndex: 9999,
+          transition: 'right 0.2s ease, top 0.2s ease',
+        }}
+      >
         <NotificationBell isLightMode={lightMode} />
       </div>
-
     </div>
   );
 };

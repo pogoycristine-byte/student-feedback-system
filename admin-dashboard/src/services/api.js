@@ -80,9 +80,9 @@ export const messagesAPI = {
   getMessages:  (threadId)          => api.get(`/messages/${threadId}`),
   send:         (threadId, message) => api.post(`/messages/${threadId}`, { message }),
   getStaffList: ()                  => api.get('/messages/staff'),
+  markAsRead:   (threadId)          => api.put(`/messages/${threadId}/read`),
 };
 
-// ✅ NEW
 export const notificationsAPI = {
   getAll:      ()    => api.get('/notifications'),
   markRead:    (id)  => api.put(`/notifications/${id}/read`),

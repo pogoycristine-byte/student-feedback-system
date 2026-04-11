@@ -4,7 +4,7 @@
     "slug": "classback",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/2.png",
+    "icon": "./assets/cb.png",
     "scheme": "mobileapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "splash": {
+        
         "image": "./assets/images/splash.png",
         "resizeMode": "cover",
         "backgroundColor": "#1a1a2e"
@@ -25,7 +26,7 @@
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/2.png"
+        "foregroundImage": "./assets/last.png"
       },
       "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Settings, Sun, Moon, UserPlus, X, Lock, User, Bell, Info, Mail, Database, Shield, FileText, Plus, Trash2, Pencil, Check, Copy, RefreshCw } from 'lucide-react';
+import { Settings, Sun, Moon, UserPlus, X, Lock, User, Bell, Info, Mail, Database, Shield, Check, Copy, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import api, { analyticsAPI, categoryAPI, userAPI } from '../services/api';
@@ -31,14 +31,22 @@ const SystemSettings = () => {
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
 
+  const isAdmin = user?.role === 'admin';
+
   const [showStaffModal,    setShowStaffModal]    = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [staffStep,         setStaffStep]         = useState(1);
   const [staffFormData,     setStaffFormData]     = useState({ name: '', email: '', password: '', studentId: '' });
   const [copiedField,       setCopiedField]       = useState(null);
-  const [mounted,           setMounted]           = useState(false); // ← added
+  const [mounted,           setMounted]           = useState(false);
 
   const [passwordFormData, setPasswordFormData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+
+  // ── show/hide toggles for each password field ──
+  const [showCurrentPwd,  setShowCurrentPwd]  = useState(false);
+  const [showNewPwd,      setShowNewPwd]      = useState(false);
+  const [showConfirmPwd,  setShowConfirmPwd]  = useState(false);
+
   const [notificationSettings, setNotificationSettings] = useState({
     emailOnNewFeedback:  true,
     emailOnStatusChange: true,
@@ -47,10 +55,7 @@ const SystemSettings = () => {
   const [systemStats,  setSystemStats]  = useState({ totalUsers: '--', totalFeedback: '--', totalCategories: '--' });
   const [statsLoading, setStatsLoading] = useState(true);
 
-  // ← added
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     fetchSystemStats();
@@ -58,7 +63,6 @@ const SystemSettings = () => {
     if (savedPrefs) setNotificationSettings(JSON.parse(savedPrefs));
   }, []);
 
-  // Lock body scroll when any modal is open
   useEffect(() => {
     if (showStaffModal || showPasswordModal) {
       document.body.style.overflow = 'hidden';
@@ -71,7 +75,7 @@ const SystemSettings = () => {
   const fetchSystemStats = async () => {
     setStatsLoading(true);
     try {
-      const [analyticsRes, categoriesRes, studentsRes] = await Promise.all([
+      const [analyticsRes, categoriesRes] = await Promise.all([
         analyticsAPI.getDashboard(),
         categoryAPI.getAll(),
         userAPI.getAll({ role: 'student' }),
@@ -149,8 +153,20 @@ const SystemSettings = () => {
   };
 
   // ── Password modal handlers ──
-  const handleOpenPasswordModal  = () => { setPasswordFormData({ currentPassword: '', newPassword: '', confirmPassword: '' }); setShowPasswordModal(true); };
-  const handleClosePasswordModal = () => { setShowPasswordModal(false); setPasswordFormData({ currentPassword: '', newPassword: '', confirmPassword: '' }); };
+  const handleOpenPasswordModal = () => {
+    setPasswordFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    setShowCurrentPwd(false);
+    setShowNewPwd(false);
+    setShowConfirmPwd(false);
+    setShowPasswordModal(true);
+  };
+  const handleClosePasswordModal = () => {
+    setShowPasswordModal(false);
+    setPasswordFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    setShowCurrentPwd(false);
+    setShowNewPwd(false);
+    setShowConfirmPwd(false);
+  };
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
@@ -186,17 +202,17 @@ const SystemSettings = () => {
     </div>
   );
 
+  // ── z-index bumped to 99999 to sit above the notification bell (9999) ──
   const overlayStyle = {
     position: 'fixed',
     inset: 0,
-    zIndex: 9999,
+    zIndex: 99999,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
   };
 
-  // ── Credential row (Staff ID / Password display) ──
   const CredentialRow = ({ label, value, field, mono = false }) => (
     <div className="rounded-lg border p-3 flex items-center justify-between gap-3" style={{ borderColor: 'var(--card-border)', backgroundColor: 'var(--table-header-bg)' }}>
       <div className="min-w-0">
@@ -218,6 +234,28 @@ const SystemSettings = () => {
     </div>
   );
 
+  // ── Reusable password input with show/hide toggle ──
+  const PasswordInput = ({ placeholder, value, onChange, show, onToggle }) => (
+    <div className="relative">
+      <input
+        type={show ? 'text' : 'password'}
+        required
+        placeholder={placeholder}
+        className="w-full px-4 py-2 pr-10 bg-input border rounded-lg placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-app-primary"
+        value={value}
+        onChange={onChange}
+      />
+      <button
+        type="button"
+        onClick={onToggle}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
+        tabIndex={-1}
+      >
+        {show ? <EyeOff size={15} /> : <Eye size={15} />}
+      </button>
+    </div>
+  );
+
   return (
     <div className="p-6 space-y-8">
 
@@ -228,18 +266,24 @@ const SystemSettings = () => {
             <Settings className="w-7 h-7 text-violet-400" />
             <h1 className="text-3xl font-bold text-app-primary">System Settings</h1>
           </div>
-          <p className="text-app-secondary ml-10">Manage system preferences, account settings, and staff accounts.</p>
+          <p className="text-app-secondary ml-10">
+            {isAdmin
+              ? 'Manage system preferences, account settings, and staff accounts.'
+              : 'Manage your account information and view system details.'}
+          </p>
         </div>
-        <button onClick={handleOpenStaffModal} className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 py-2 rounded-lg hover:opacity-90 transition-opacity text-sm">
-          <UserPlus size={16} /> Add Staff
-        </button>
+        {isAdmin && (
+          <button onClick={handleOpenStaffModal} className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 py-2 rounded-lg hover:opacity-90 transition-opacity text-sm">
+            <UserPlus size={16} /> Add Staff
+          </button>
+        )}
       </div>
 
       {/* ===== ACCOUNT INFORMATION ===== */}
       <div className="bg-card backdrop-blur-lg rounded-xl border">
         <div className="p-6 border-b" style={{ borderColor: 'var(--card-border)' }}>
           <h2 className="text-xl font-bold text-app-primary">Account Information</h2>
-          <p className="text-app-secondary text-sm mt-1">Your admin account details and security settings.</p>
+          <p className="text-app-secondary text-sm mt-1">Your account details and security settings.</p>
         </div>
         <div className="px-6 py-4 flex items-center gap-6 flex-wrap">
           <div className="p-2.5 rounded-xl bg-violet-500/20 shrink-0">
@@ -247,12 +291,12 @@ const SystemSettings = () => {
           </div>
           <div className="shrink-0">
             <p className="text-app-tertiary text-[10px] uppercase tracking-wider mb-0.5">Full Name</p>
-            <p className="text-app-primary font-semibold text-sm">{user?.name || 'Admin User'}</p>
+            <p className="text-app-primary font-semibold text-sm">{user?.name || 'User'}</p>
           </div>
           <div className="w-px h-8 bg-white/10 shrink-0" />
           <div className="shrink-0">
             <p className="text-app-tertiary text-[10px] uppercase tracking-wider mb-0.5">Email</p>
-            <p className="text-app-primary font-semibold text-sm">{user?.email || 'admin@example.com'}</p>
+            <p className="text-app-primary font-semibold text-sm">{user?.email || 'N/A'}</p>
           </div>
           <div className="w-px h-8 bg-white/10 shrink-0" />
           <div className="shrink-0">
@@ -271,84 +315,93 @@ const SystemSettings = () => {
             </span>
           </div>
           <div className="ml-auto shrink-0">
-            <button onClick={handleOpenPasswordModal} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-lg hover:opacity-90 transition-opacity text-sm">
+            {/* ── pointer-events-auto ensures the button is always clickable ── */}
+            <button
+              onClick={handleOpenPasswordModal}
+              style={{ position: 'relative', zIndex: 10, pointerEvents: 'auto' }}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-lg hover:opacity-90 transition-opacity text-sm"
+            >
               <Lock size={14} /> Change Password
             </button>
           </div>
         </div>
       </div>
 
-      {/* ===== APPEARANCE SETTINGS ===== */}
-      <div className="bg-card backdrop-blur-lg rounded-xl border">
-        <div className="p-6 border-b" style={{ borderColor: 'var(--card-border)' }}>
-          <h2 className="text-xl font-bold text-app-primary">Appearance</h2>
-          <p className="text-app-secondary text-sm mt-1">Customize the visual appearance of the dashboard.</p>
-        </div>
-        <div className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {theme === 'dark'
-                ? <div className="p-2.5 rounded-lg bg-violet-500/20"><Moon className="w-5 h-5 text-violet-400" /></div>
-                : <div className="p-2.5 rounded-lg bg-yellow-500/20"><Sun className="w-5 h-5 text-yellow-500" /></div>
-              }
-              <div>
-                <p className="text-app-primary font-semibold">Theme Mode</p>
-                <p className="text-app-secondary text-sm">{theme === 'dark' ? 'Dark mode is active' : 'Light mode is active'}</p>
-              </div>
-            </div>
-            <button
-              onClick={toggleTheme}
-              className="relative inline-flex items-center h-8 w-16 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2"
-              style={{ backgroundColor: theme === 'dark' ? '#7c3aed' : '#eab308' }}
-            >
-              <span className={`inline-block w-6 h-6 transform rounded-full bg-white transition-transform ${theme === 'dark' ? 'translate-x-9' : 'translate-x-1'}`}>
-                {theme === 'dark' ? <Moon className="w-4 h-4 text-violet-600 m-1" /> : <Sun className="w-4 h-4 text-yellow-600 m-1" />}
-              </span>
-            </button>
+      {/* ===== APPEARANCE — admin only ===== */}
+      {isAdmin && (
+        <div className="bg-card backdrop-blur-lg rounded-xl border">
+          <div className="p-6 border-b" style={{ borderColor: 'var(--card-border)' }}>
+            <h2 className="text-xl font-bold text-app-primary">Appearance</h2>
+            <p className="text-app-secondary text-sm mt-1">Customize the visual appearance of the dashboard.</p>
           </div>
-          <div className="mt-4 p-4 rounded-lg" style={{ backgroundColor: 'var(--table-header-bg)' }}>
-            <p className="text-app-tertiary text-xs">
-              💡 <strong>Tip:</strong> The theme preference is saved automatically and will persist across sessions.
-              {theme === 'light' && ' Light mode is easier on the eyes in bright environments.'}
-              {theme === 'dark'  && ' Dark mode reduces eye strain in low-light conditions.'}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* ===== NOTIFICATION PREFERENCES ===== */}
-      <div className="bg-card backdrop-blur-lg rounded-xl border">
-        <div className="p-6 border-b" style={{ borderColor: 'var(--card-border)' }}>
-          <h2 className="text-xl font-bold text-app-primary">Notification Preferences</h2>
-          <p className="text-app-secondary text-sm mt-1">Control when and how you receive notifications.</p>
-        </div>
-        <div className="p-6 space-y-4">
-          {[
-            { key: 'emailOnNewFeedback',  icon: <Mail />, iconBg: 'bg-blue-500/20',  iconColor: 'text-blue-400',  label: 'New Feedback Submitted', sub: 'Get notified when students submit new feedback' },
-            { key: 'emailOnStatusChange', icon: <Bell />, iconBg: 'bg-green-500/20', iconColor: 'text-green-400', label: 'Status Updates',           sub: 'Get notified when feedback status changes' },
-            { key: 'emailOnNewMessage',   icon: <Mail />, iconBg: 'bg-pink-500/20',  iconColor: 'text-pink-400',  label: 'New Messages',             sub: 'Get notified when students send messages' },
-          ].map(({ key, icon, iconBg, iconColor, label, sub }) => (
-            <div key={key} className="flex items-center justify-between">
+          <div className="p-6">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`p-2.5 rounded-lg ${iconBg}`}>{React.cloneElement(icon, { className: `w-5 h-5 ${iconColor}` })}</div>
+                {theme === 'dark'
+                  ? <div className="p-2.5 rounded-lg bg-violet-500/20"><Moon className="w-5 h-5 text-violet-400" /></div>
+                  : <div className="p-2.5 rounded-lg bg-yellow-500/20"><Sun className="w-5 h-5 text-yellow-500" /></div>
+                }
                 <div>
-                  <p className="text-app-primary font-semibold">{label}</p>
-                  <p className="text-app-secondary text-sm">{sub}</p>
+                  <p className="text-app-primary font-semibold">Theme Mode</p>
+                  <p className="text-app-secondary text-sm">{theme === 'dark' ? 'Dark mode is active' : 'Light mode is active'}</p>
                 </div>
               </div>
               <button
-                onClick={() => handleNotificationToggle(key)}
-                className={`relative inline-flex items-center h-8 w-16 rounded-full transition-colors ${notificationSettings[key] ? 'bg-violet-500' : 'bg-gray-500'}`}
+                onClick={toggleTheme}
+                className="relative inline-flex items-center h-8 w-16 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2"
+                style={{ backgroundColor: theme === 'dark' ? '#7c3aed' : '#eab308' }}
               >
-                <span className={`inline-block w-6 h-6 transform rounded-full bg-white transition-transform ${notificationSettings[key] ? 'translate-x-9' : 'translate-x-1'}`} />
+                <span className={`inline-block w-6 h-6 transform rounded-full bg-white transition-transform ${theme === 'dark' ? 'translate-x-9' : 'translate-x-1'}`}>
+                  {theme === 'dark' ? <Moon className="w-4 h-4 text-violet-600 m-1" /> : <Sun className="w-4 h-4 text-yellow-600 m-1" />}
+                </span>
               </button>
             </div>
-          ))}
-          <div className="mt-4 p-4 rounded-lg" style={{ backgroundColor: 'var(--table-header-bg)' }}>
-            <p className="text-app-tertiary text-xs">ℹ️ <strong>Note:</strong> Notification preferences are saved locally in your browser.</p>
+            <div className="mt-4 p-4 rounded-lg" style={{ backgroundColor: 'var(--table-header-bg)' }}>
+              <p className="text-app-tertiary text-xs">
+                💡 <strong>Tip:</strong> The theme preference is saved automatically and will persist across sessions.
+                {theme === 'light' && ' Light mode is easier on the eyes in bright environments.'}
+                {theme === 'dark'  && ' Dark mode reduces eye strain in low-light conditions.'}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ===== NOTIFICATION PREFERENCES — admin only ===== */}
+      {isAdmin && (
+        <div className="bg-card backdrop-blur-lg rounded-xl border">
+          <div className="p-6 border-b" style={{ borderColor: 'var(--card-border)' }}>
+            <h2 className="text-xl font-bold text-app-primary">Notification Preferences</h2>
+            <p className="text-app-secondary text-sm mt-1">Control when and how you receive notifications.</p>
+          </div>
+          <div className="p-6 space-y-4">
+            {[
+              { key: 'emailOnNewFeedback',  icon: <Mail />, iconBg: 'bg-blue-500/20',  iconColor: 'text-blue-400',  label: 'New Feedback Submitted', sub: 'Get notified when students submit new feedback' },
+              { key: 'emailOnStatusChange', icon: <Bell />, iconBg: 'bg-green-500/20', iconColor: 'text-green-400', label: 'Status Updates',           sub: 'Get notified when feedback status changes' },
+              { key: 'emailOnNewMessage',   icon: <Mail />, iconBg: 'bg-pink-500/20',  iconColor: 'text-pink-400',  label: 'New Messages',             sub: 'Get notified when students send messages' },
+            ].map(({ key, icon, iconBg, iconColor, label, sub }) => (
+              <div key={key} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-lg ${iconBg}`}>{React.cloneElement(icon, { className: `w-5 h-5 ${iconColor}` })}</div>
+                  <div>
+                    <p className="text-app-primary font-semibold">{label}</p>
+                    <p className="text-app-secondary text-sm">{sub}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleNotificationToggle(key)}
+                  className={`relative inline-flex items-center h-8 w-16 rounded-full transition-colors ${notificationSettings[key] ? 'bg-violet-500' : 'bg-gray-500'}`}
+                >
+                  <span className={`inline-block w-6 h-6 transform rounded-full bg-white transition-transform ${notificationSettings[key] ? 'translate-x-9' : 'translate-x-1'}`} />
+                </button>
+              </div>
+            ))}
+            <div className="mt-4 p-4 rounded-lg" style={{ backgroundColor: 'var(--table-header-bg)' }}>
+              <p className="text-app-tertiary text-xs">ℹ️ <strong>Note:</strong> Notification preferences are saved locally in your browser.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===== SYSTEM INFORMATION ===== */}
       <div className="bg-card backdrop-blur-lg rounded-xl border">
@@ -391,7 +444,7 @@ const SystemSettings = () => {
 
       {/* ===== CHANGE PASSWORD MODAL ===== */}
       {mounted && showPasswordModal && createPortal(
-        <div className="bg-modal-overlay backdrop-blur-sm" style={overlayStyle}>
+        <div style={overlayStyle}>
           <div className="bg-modal rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-3">
@@ -403,24 +456,33 @@ const SystemSettings = () => {
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div>
                 <label className="block text-app-secondary mb-2">Current Password *</label>
-                <input type="password" required placeholder="Enter your current password"
-                  className="w-full px-4 py-2 bg-input border rounded-lg placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-app-primary"
+                <PasswordInput
+                  placeholder="Enter your current password"
                   value={passwordFormData.currentPassword}
-                  onChange={(e) => setPasswordFormData({ ...passwordFormData, currentPassword: e.target.value })} />
+                  onChange={(e) => setPasswordFormData({ ...passwordFormData, currentPassword: e.target.value })}
+                  show={showCurrentPwd}
+                  onToggle={() => setShowCurrentPwd(v => !v)}
+                />
               </div>
               <div>
                 <label className="block text-app-secondary mb-2">New Password *</label>
-                <input type="password" required placeholder="Enter new password (min. 6 characters)"
-                  className="w-full px-4 py-2 bg-input border rounded-lg placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-app-primary"
+                <PasswordInput
+                  placeholder="Enter new password (min. 6 characters)"
                   value={passwordFormData.newPassword}
-                  onChange={(e) => setPasswordFormData({ ...passwordFormData, newPassword: e.target.value })} />
+                  onChange={(e) => setPasswordFormData({ ...passwordFormData, newPassword: e.target.value })}
+                  show={showNewPwd}
+                  onToggle={() => setShowNewPwd(v => !v)}
+                />
               </div>
               <div>
                 <label className="block text-app-secondary mb-2">Confirm New Password *</label>
-                <input type="password" required placeholder="Re-enter new password"
-                  className="w-full px-4 py-2 bg-input border rounded-lg placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-app-primary"
+                <PasswordInput
+                  placeholder="Re-enter new password"
                   value={passwordFormData.confirmPassword}
-                  onChange={(e) => setPasswordFormData({ ...passwordFormData, confirmPassword: e.target.value })} />
+                  onChange={(e) => setPasswordFormData({ ...passwordFormData, confirmPassword: e.target.value })}
+                  show={showConfirmPwd}
+                  onToggle={() => setShowConfirmPwd(v => !v)}
+                />
               </div>
               <div className="p-3 rounded-lg bg-violet-500/10 border border-violet-500/20">
                 <p className="text-app-tertiary text-xs">🔒 Your password must be at least 6 characters long and different from your current password.</p>
@@ -435,12 +497,10 @@ const SystemSettings = () => {
         document.body
       )}
 
-      {/* ===== STAFF CREATION MODAL ===== */}
-      {mounted && showStaffModal && createPortal(
-        <div className="bg-modal-overlay backdrop-blur-sm" style={overlayStyle}>
+      {/* ===== STAFF CREATION MODAL — admin only ===== */}
+      {isAdmin && mounted && showStaffModal && createPortal(
+        <div style={overlayStyle}>
           <div className="bg-modal rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
-
-            {/* Header */}
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-blue-500/20"><UserPlus className="w-5 h-5 text-blue-400" /></div>
@@ -449,7 +509,6 @@ const SystemSettings = () => {
               <button onClick={handleCloseStaffModal} className="text-app-secondary hover:text-app-primary"><X size={24} /></button>
             </div>
 
-            {/* Step indicator */}
             <div className="flex items-center gap-2 mb-6">
               {[1, 2].map((s) => (
                 <React.Fragment key={s}>
@@ -463,85 +522,50 @@ const SystemSettings = () => {
             </div>
 
             {staffStep === 1 ? (
-              /* ── Step 1: Name + Email ── */
               <form onSubmit={handleStaffNext} className="space-y-4">
                 <div>
                   <label className="block text-app-secondary mb-2">Full Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. John Doe"
+                  <input type="text" required placeholder="e.g. John Doe"
                     className="w-full px-4 py-2 bg-input border rounded-lg placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-app-primary"
                     value={staffFormData.name}
-                    onChange={(e) => setStaffFormData({ ...staffFormData, name: e.target.value })}
-                  />
+                    onChange={(e) => setStaffFormData({ ...staffFormData, name: e.target.value })} />
                 </div>
                 <div>
                   <label className="block text-app-secondary mb-2">Email Address *</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="e.g. staff@schoolname.edu"
+                  <input type="email" required placeholder="e.g. staff@schoolname.edu"
                     className="w-full px-4 py-2 bg-input border rounded-lg placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-app-primary"
                     value={staffFormData.email}
-                    onChange={(e) => setStaffFormData({ ...staffFormData, email: e.target.value })}
-                  />
+                    onChange={(e) => setStaffFormData({ ...staffFormData, email: e.target.value })} />
                 </div>
                 <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                  <p className="text-app-tertiary text-xs">ℹ️ Staff ID and password will be auto-generated in the next step. You can copy and share them with the staff member.</p>
+                  <p className="text-app-tertiary text-xs">ℹ️ Staff ID and password will be auto-generated in the next step.</p>
                 </div>
                 <div className="flex gap-3 pt-2">
-                  <button
-                    type="submit"
-                    className="flex-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-6 py-2 rounded-lg hover:opacity-90 font-semibold"
-                  >
-                    Next →
-                  </button>
-                  <button type="button" onClick={handleCloseStaffModal} className="px-6 py-2 bg-card text-app-primary rounded-lg hover:bg-card-hover">
-                    Cancel
-                  </button>
+                  <button type="submit" className="flex-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-6 py-2 rounded-lg hover:opacity-90 font-semibold">Next →</button>
+                  <button type="button" onClick={handleCloseStaffModal} className="px-6 py-2 bg-card text-app-primary rounded-lg hover:bg-card-hover">Cancel</button>
                 </div>
               </form>
             ) : (
-              /* ── Step 2: Review auto-generated credentials ── */
               <form onSubmit={handleStaffSubmit} className="space-y-4">
-                {/* Summary */}
                 <div className="rounded-lg border p-3 flex items-center gap-3" style={{ borderColor: 'var(--card-border)', backgroundColor: 'var(--table-header-bg)' }}>
-                  <div className="p-2 rounded-lg bg-blue-500/20 shrink-0">
-                    <User size={16} className="text-blue-400" />
-                  </div>
+                  <div className="p-2 rounded-lg bg-blue-500/20 shrink-0"><User size={16} className="text-blue-400" /></div>
                   <div className="min-w-0">
                     <p className="text-app-primary text-sm font-semibold truncate">{staffFormData.name}</p>
                     <p className="text-app-secondary text-xs truncate">{staffFormData.email}</p>
                   </div>
                 </div>
-
-                <CredentialRow label="Staff ID"  value={staffFormData.studentId} field="id"       mono />
-                <CredentialRow label="Password"  value={staffFormData.password}  field="password" mono />
-
-                {/* Regenerate */}
-                <button
-                  type="button"
-                  onClick={handleRegenerateCredentials}
-                  className="flex items-center gap-2 text-xs text-app-tertiary hover:text-app-primary px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 transition-all"
-                >
+                <CredentialRow label="Staff ID" value={staffFormData.studentId} field="id"       mono />
+                <CredentialRow label="Password" value={staffFormData.password}  field="password" mono />
+                <button type="button" onClick={handleRegenerateCredentials}
+                  className="flex items-center gap-2 text-xs text-app-tertiary hover:text-app-primary px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 transition-all">
                   <RefreshCw size={11} /> Regenerate credentials
                 </button>
-
                 <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <p className="text-amber-400/80 text-xs">⚠️ Make sure to copy and securely share these credentials with the staff member before closing.</p>
+                  <p className="text-amber-400/80 text-xs">⚠️ Make sure to copy and securely share these credentials before closing.</p>
                 </div>
-
                 <div className="flex gap-3 pt-2">
-                  <button
-                    type="submit"
-                    className="flex-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-6 py-2 rounded-lg hover:opacity-90 font-semibold"
-                  >
-                    Create Staff Account
-                  </button>
-                  <button type="button" onClick={() => setStaffStep(1)} className="px-6 py-2 bg-card text-app-primary rounded-lg hover:bg-card-hover">
-                    ← Back
-                  </button>
+                  <button type="submit" className="flex-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-6 py-2 rounded-lg hover:opacity-90 font-semibold">Create Staff Account</button>
+                  <button type="button" onClick={() => setStaffStep(1)} className="px-6 py-2 bg-card text-app-primary rounded-lg hover:bg-card-hover">← Back</button>
                 </div>
               </form>
             )}

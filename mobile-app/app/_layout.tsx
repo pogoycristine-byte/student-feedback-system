@@ -2,8 +2,10 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
+import { useEffect, useState } from 'react';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import CustomSplashScreen from '@/components/CustomSplashScreen';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -11,6 +13,18 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsReady(true);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!isReady) {
+    return <CustomSplashScreen />;
+  }
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

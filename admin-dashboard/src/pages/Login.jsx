@@ -9,6 +9,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false); // ← NEW
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -23,6 +24,16 @@ const Login = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // ── Remember Me: load saved email on mount ──────────────────────────────
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('remembered_email');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
+  // ────────────────────────────────────────────────────────────────────────
 
   const validatePassword = (pw) => ({
     hasUpper:   /[A-Z]/.test(pw),
@@ -97,6 +108,15 @@ const Login = () => {
     const result = await login(email, password);
     if (result.success) {
       localStorage.removeItem('login_error');
+
+      // ── Remember Me: save or clear email ─────────────────────────────
+      if (rememberMe) {
+        localStorage.setItem('remembered_email', email);
+      } else {
+        localStorage.removeItem('remembered_email');
+      }
+      // ─────────────────────────────────────────────────────────────────
+
       navigate('/dashboard');
     } else {
       localStorage.setItem('login_error', result.message);
@@ -370,6 +390,40 @@ const Login = () => {
     ::-webkit-scrollbar {
       display: none;
     }
+
+    /* ── Remember Me custom checkbox ── */
+    .remember-checkbox {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border: 1.5px solid rgba(167,139,250,0.4);
+      border-radius: 4px;
+      background: transparent;
+      cursor: pointer;
+      position: relative;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .remember-checkbox:checked {
+      background: linear-gradient(135deg,#6D28D9,#9333ea);
+      border-color: #7c3aed;
+    }
+    .remember-checkbox:checked::after {
+      content: '';
+      position: absolute;
+      left: 3px;
+      top: 0px;
+      width: 5px;
+      height: 9px;
+      border: 2px solid #fff;
+      border-top: none;
+      border-left: none;
+      transform: rotate(45deg);
+    }
+    .remember-checkbox:hover {
+      border-color: rgba(167,139,250,0.8);
+    }
   `;
 
   return (
@@ -634,34 +688,32 @@ const Login = () => {
             borderRadius:'50%', pointerEvents:'none',
           }} />
 
-          {/* ✅ Logo added here inside the card */}
-         
-<div style={{ position:'relative', zIndex:1, marginBottom:'20px', display:'flex', justifyContent:'center' }}>
-  <img
-    src="/las.png"
-    alt="Logo"
-    style={{
-      width:'72px',
-      height:'72px',
-      objectFit:'cover',
-      borderRadius:'50%',
-      border:'2px solid rgba(167,139,250,0.4)',
-    }}
-  />
-</div>
+          <div style={{ position:'relative', zIndex:1, marginBottom:'20px', display:'flex', justifyContent:'center' }}>
+            <img
+              src="/las.png"
+              alt="Logo"
+              style={{
+                width:'72px',
+                height:'72px',
+                objectFit:'cover',
+                borderRadius:'50%',
+                border:'2px solid rgba(167,139,250,0.4)',
+              }}
+            />
+          </div>
 
           {/* Header */}
-        <div style={{ position:'relative', zIndex:1, marginBottom:'28px', textAlign:'center' }}>
-  <h2 style={{
-    fontFamily:"'Playfair Display', Georgia, serif",
-    fontSize:'26px', fontWeight:900, lineHeight:1.2, margin:'0 0 6px 0',
-    background:'linear-gradient(135deg,#a78bfa,#f472b6)',
-    WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
-  }}>ClassBack</h2>
-  <p style={{ fontSize:'13px', color:'rgba(255,255,255,0.38)', margin:0 }}>
-    Enter your credentials to access your account
-  </p>
-</div>
+          <div style={{ position:'relative', zIndex:1, marginBottom:'28px', textAlign:'center' }}>
+            <h2 style={{
+              fontFamily:"'Playfair Display', Georgia, serif",
+              fontSize:'26px', fontWeight:900, lineHeight:1.2, margin:'0 0 6px 0',
+              background:'linear-gradient(135deg,#a78bfa,#f472b6)',
+              WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+            }}>ClassBack</h2>
+            <p style={{ fontSize:'13px', color:'rgba(255,255,255,0.38)', margin:0 }}>
+              Enter your credentials to access your account
+            </p>
+          </div>
 
           {error && (
             <div style={{
@@ -715,10 +767,19 @@ const Login = () => {
             </div>
 
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'22px' }}>
-              <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
-                <input type="checkbox" style={{ accentColor:'#7c3aed', width:15, height:15 }} />
-                <span style={{ fontSize:'13px', color:'rgba(255,255,255,0.4)' }}>Remember me</span>
+              {/* ── Functional Remember Me ── */}
+              <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', userSelect:'none' }}>
+                <input
+                  type="checkbox"
+                  className="remember-checkbox"
+                  checked={rememberMe}
+                  onChange={e => setRememberMe(e.target.checked)}
+                />
+                <span style={{ fontSize:'13px', color: rememberMe ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.4)', transition:'color 0.2s' }}>
+                  Remember me
+                </span>
               </label>
+              {/* ────────────────────────────── */}
               <span onClick={() => setShowForgotModal(true)}
                 style={{ fontSize:'13px', color:'#a78bfa', cursor:'pointer', fontWeight:600 }}>
                 Forgot password?
@@ -741,7 +802,7 @@ const Login = () => {
         </div>
       </div>
 
-      {/* Three buttons placed horizontally in the middle between left picture and login form - adjusted lower, dark violet/blacklight style, and more faint */}
+      {/* Three buttons */}
       <div style={{
         position: 'absolute',
         left: '25%',
@@ -754,12 +815,10 @@ const Login = () => {
         alignItems: 'center',
       }}>
         <button
-          onClick={() => {
-            console.log('Anonymous Feedback clicked');
-          }}
+          onClick={() => { console.log('Anonymous Feedback clicked'); }}
           style={{
             padding: '12px 24px',
-            background: 'rgba(20, 5, 40, 0.55)',
+            background: 'rgba(20, 5, 40, 0.25)',
             backdropFilter: 'blur(10px)',
             border: '1px solid rgba(139, 92, 246, 0.3)',
             borderRadius: '40px',
@@ -791,12 +850,10 @@ const Login = () => {
           📝 Anonymous Feedback
         </button>
         <button
-          onClick={() => {
-            console.log('Manage Students clicked');
-          }}
+          onClick={() => { console.log('Manage Students clicked'); }}
           style={{
             padding: '12px 24px',
-            background: 'rgba(20, 5, 40, 0.55)',
+            background: 'rgba(20, 5, 40, 0.25)',
             backdropFilter: 'blur(10px)',
             border: '1px solid rgba(139, 92, 246, 0.3)',
             borderRadius: '40px',
@@ -828,12 +885,10 @@ const Login = () => {
           👥 Manage Students
         </button>
         <button
-          onClick={() => {
-            console.log('Help the School clicked');
-          }}
+          onClick={() => { console.log('Help the School clicked'); }}
           style={{
             padding: '12px 24px',
-            background: 'rgba(20, 5, 40, 0.55)',
+            background: 'rgba(20, 5, 40, 0.25)',
             backdropFilter: 'blur(10px)',
             border: '1px solid rgba(139, 92, 246, 0.3)',
             borderRadius: '40px',

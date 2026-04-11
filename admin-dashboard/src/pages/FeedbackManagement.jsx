@@ -338,15 +338,20 @@ const FeedbackManagement = () => {
       await feedbackAPI.updateStatus(selectedFeedback._id, { status: newStatus, comment: adminComment });
       if (adminComment.trim()) await feedbackAPI.sendMessage(selectedFeedback._id, adminComment.trim());
       setShowModal(false);
-window.dispatchEvent(new CustomEvent('feedbackModalOpen', { detail: { open: false } }));
-fetchFeedback();
+      window.dispatchEvent(new CustomEvent('feedbackModalOpen', { detail: { open: false } }));
+      fetchFeedback();
       alert('Feedback updated successfully!');
     } catch (error) {
       alert(`Failed to update feedback: ${error.response?.data?.message || error.message}`);
     }
   };
 
+  // ── Only admin can delete feedback ──
   const handleDelete = async (id) => {
+    if (!isAdmin) {
+      alert('You do not have permission to delete feedback. Only admins can perform this action.');
+      return;
+    }
     if (window.confirm('Are you sure you want to delete this feedback?')) {
       try {
         await feedbackAPI.delete(id);
@@ -819,10 +824,13 @@ fetchFeedback();
                             </span>
                           )}
                         </button>
-                        <button onClick={() => handleDelete(item._id)} title="Delete"
-                          className="p-2 rounded-lg text-red-400 hover:text-white hover:bg-red-500 border border-red-500/30 hover:border-red-500 transition-all">
-                          <Trash2 size={15} />
-                        </button>
+                        {/* ── Delete button: hidden for staff, visible only for admin ── */}
+                        {isAdmin && (
+                          <button onClick={() => handleDelete(item._id)} title="Delete"
+                            className="p-2 rounded-lg text-red-400 hover:text-white hover:bg-red-500 border border-red-500/30 hover:border-red-500 transition-all">
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -989,7 +997,7 @@ fetchFeedback();
                     Update Feedback
                   </button>
                  <button onClick={() => { setShowModal(false); window.dispatchEvent(new CustomEvent('feedbackModalOpen', { detail: { open: false } })); }}
-    className="w-full py-2 rounded-lg font-medium text-sm transition-all hover:bg-white/10"
+                    className="w-full py-2 rounded-lg font-medium text-sm transition-all hover:bg-white/10"
                     style={{ background: isLightMode ? 'rgba(237,233,254,0.6)' : 'rgba(255,255,255,0.06)', border: isLightMode ? '1px solid rgba(196,181,253,0.4)' : '1px solid rgba(255,255,255,0.12)', color: isLightMode ? '#4c1d95' : '#d1d5db' }}>
                     Close
                   </button>
