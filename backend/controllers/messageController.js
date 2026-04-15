@@ -227,3 +227,97 @@ exports.sendMessage = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+// PUT /api/messages/:threadId/message/:msgId
+exports.editMessage = async (req, res) => {
+  try {
+    const { threadId, msgId } = req.params;
+    const { message } = req.body;
+    const userId = req.user._id;
+
+    if (!message?.trim()) {
+      return res.status(400).json({ message: 'Message cannot be empty' });
+    }
+
+    if (message.trim().length > 2000) {
+      return res.status(400).json({ message: 'Message must be under 2000 characters' });
+    }
+
+    const thread = await Message.findOne({
+      _id:          threadId,
+      participants: userId,
+    });
+
+    if (!thread) return res.status(404).json({ message: 'Thread not found' });
+
+    const msg = thread.messages.id(msgId);
+    if (!msg) return res.status(404).json({ message: 'Message not found' });
+
+    // Only the sender can edit their own message
+    if (msg.sender.toString() !== userId.toString()) {
+      return res.status(403).json({ message: 'You can only edit your own messages' });
+    }
+
+    msg.message = sanitizeString(message.trim());
+    msg.edited  = true;
+
+    await thread.save();
+    res.json({ success: true, message: msg });
+  } catch (err) {
+    console.error('editMessage:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// DELETE /api/messages/:threadId/message/:msgId
+exports.deleteMessage = async (req, res) => {
+  try {
+    const { threadId, msgId } = req.params;
+    const userId = req.user._id;
+
+    const thread = await Message.findOne({
+      _id:          threadId,
+      participants: userId,
+    });
+
+    if (!thread) return res.status(404).json({ message: 'Thread not found' });
+
+    const msg = thread.messages.id(msgId);
+    if (!msg) return res.status(404).json({ message: 'Message not found' });
+
+    // Only the sender can delete their own message
+    if (msg.sender.toString() !== userId.toString()) {
+      return res.status(403).json({ message: 'You can only delete your own messages' });
+    }
+
+    msg.deleteOne();
+    thread.updatedAt = new Date();
+
+    await thread.save();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('deleteMessage:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// DELETE /api/messages/:threadId
+exports.deleteThread = async (req, res) => {
+  try {
+    const { threadId } = req.params;
+    const userId = req.user._id;
+
+    const thread = await Message.findOne({
+      _id:          threadId,
+      participants: userId,
+    });
+
+    if (!thread) return res.status(404).json({ message: 'Thread not found' });
+
+    await thread.deleteOne();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('deleteThread:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

@@ -10,6 +10,7 @@ const messageItemSchema = new mongoose.Schema(
     senderName: { type: String, required: true },
     senderRole: { type: String, required: true },
     message:    { type: String, required: true, trim: true },
+    edited:     { type: Boolean, default: false }, // ✅ ADDED: tracks if message was edited
   },
   { timestamps: true }
 );

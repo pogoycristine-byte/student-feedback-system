@@ -6,9 +6,12 @@ const {
   getMessages,
   sendMessage,
   markAsRead,
+  editMessage,
+  deleteMessage,
+  deleteThread,
 } = require('../controllers/messageController');
 const { protect } = require('../middleware/auth');
-const rateLimit = require('express-rate-limit'); // ✅ ADDED
+const rateLimit = require('express-rate-limit');
 
 // ✅ ADDED: limit message sending to prevent flooding
 const messageLimiter = rateLimit({
@@ -20,12 +23,19 @@ const messageLimiter = rateLimit({
 // All routes require a valid JWT
 router.use(protect);
 
-router.get('/staff', getStaffList);
-router.get('/threads', getThreads);
-router.get('/:threadId', getMessages);
-router.put('/:threadId/read', markAsRead);
+router.get('/staff',    getStaffList);
+router.get('/threads',  getThreads);
+router.get('/:threadId',         getMessages);
+router.put('/:threadId/read',    markAsRead);
 
 // ✅ ADDED: messageLimiter on send only
 router.post('/:recipientIdOrThreadId', messageLimiter, sendMessage);
+
+// ✅ ADDED: edit and delete a single message
+router.put('/:threadId/message/:msgId',    editMessage);
+router.delete('/:threadId/message/:msgId', deleteMessage);
+
+// ✅ ADDED: delete entire thread
+router.delete('/:threadId', deleteThread);
 
 module.exports = router;
