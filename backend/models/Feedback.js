@@ -151,14 +151,4 @@ const feedbackSchema = new mongoose.Schema({
   timestamps: true
 });
 
-feedbackSchema.pre('save', function(next) {
-  if (!this.isNew && this.isModified('status')) {
-    this.statusHistory.push({
-      status: this.status,
-      changedAt: new Date()
-    });
-  }
-  next();
-});
-
 module.exports = mongoose.model('Feedback', feedbackSchema);
