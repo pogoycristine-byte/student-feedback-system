@@ -229,7 +229,6 @@ exports.getAllFeedback = async (req, res) => {
       query.priority = priority;
     }
 
-    // ✅ ADDED: validate dateFrom and dateTo before using them
     if (dateFrom || dateTo) {
       query.createdAt = {};
       if (dateFrom) {
@@ -265,6 +264,7 @@ exports.getAllFeedback = async (req, res) => {
       .populate('category', 'name icon')
       .populate('adminResponse.respondedBy', 'name role')
       .populate('lastUpdatedBy', 'name role')
+      .populate('statusHistory.changedBy', 'name role') // ✅ ADDED: populate changedBy so activity log shows real names
       .sort({ createdAt: -1 });
 
     const processedFeedback = feedback.map(item => {
@@ -611,7 +611,6 @@ exports.submitRating = async (req, res) => {
       });
     }
 
-    // ✅ ADDED: proper type check to prevent string coercion bypass
     const rating = Number(satisfactionRating);
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
       return res.status(400).json({
@@ -627,7 +626,6 @@ exports.submitRating = async (req, res) => {
       });
     }
 
-    // ✅ CHANGED: use validated rating variable instead of raw input
     feedback.satisfactionRating = rating;
     feedback.satisfactionComment = sanitizeString(satisfactionComment) || '';
     feedback.ratedAt = new Date();
