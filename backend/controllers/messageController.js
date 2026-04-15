@@ -79,14 +79,21 @@ exports.getThreads = async (req, res) => {
 // GET /api/messages/:threadId
 exports.getMessages = async (req, res) => {
   try {
+    const userId = req.user._id;
+
     const thread = await Message.findOne({
       _id:          req.params.threadId,
-      participants: req.user._id,
+      participants: userId,
     }).populate('participants', 'name email role');
 
     if (!thread) return res.status(404).json({ message: 'Thread not found' });
 
-    res.json({ messages: thread.messages, participants: thread.participants });
+    // Filter out messages hidden for this user
+    const messages = thread.messages.filter(
+      (m) => !m.hiddenFrom?.some((id) => id.toString() === userId.toString())
+    );
+
+    res.json({ messages, participants: thread.participants });
   } catch (err) {
     console.error('getMessages:', err);
     res.status(500).json({ message: 'Server error' });
@@ -297,6 +304,37 @@ exports.deleteMessage = async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('deleteMessage:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// DELETE /api/messages/:threadId/message/:msgId/me  ✅ ADDED: soft-delete for one user only
+exports.deleteMessageForMe = async (req, res) => {
+  try {
+    const { threadId, msgId } = req.params;
+    const userId = req.user._id;
+
+    const thread = await Message.findOne({
+      _id:          threadId,
+      participants: userId,
+    });
+
+    if (!thread) return res.status(404).json({ message: 'Thread not found' });
+
+    const msg = thread.messages.id(msgId);
+    if (!msg) return res.status(404).json({ message: 'Message not found' });
+
+    // Any participant can hide a message from themselves
+    if (!msg.hiddenFrom) msg.hiddenFrom = [];
+    const alreadyHidden = msg.hiddenFrom.some((id) => id.toString() === userId.toString());
+    if (!alreadyHidden) {
+      msg.hiddenFrom.push(userId);
+    }
+
+    await thread.save();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('deleteMessageForMe:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };

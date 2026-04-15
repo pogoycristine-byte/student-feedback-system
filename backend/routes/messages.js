@@ -8,6 +8,7 @@ const {
   markAsRead,
   editMessage,
   deleteMessage,
+  deleteMessageForMe, // ✅ ADDED
   deleteThread,
 } = require('../controllers/messageController');
 const { protect } = require('../middleware/auth');
@@ -32,8 +33,9 @@ router.put('/:threadId/read',    markAsRead);
 router.post('/:recipientIdOrThreadId', messageLimiter, sendMessage);
 
 // ✅ ADDED: edit and delete a single message
-router.put('/:threadId/message/:msgId',    editMessage);
-router.delete('/:threadId/message/:msgId', deleteMessage);
+router.put('/:threadId/message/:msgId',       editMessage);
+router.delete('/:threadId/message/:msgId/me', deleteMessageForMe); // ✅ ADDED: must be before /:threadId/message/:msgId
+router.delete('/:threadId/message/:msgId',    deleteMessage);
 
 // ✅ ADDED: delete entire thread
 router.delete('/:threadId', deleteThread);
