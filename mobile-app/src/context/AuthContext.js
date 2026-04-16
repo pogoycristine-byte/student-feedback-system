@@ -55,6 +55,14 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
+      // ✅ ADDED: basic input validation before sending to API
+      if (!email || !password) {
+        return { success: false, message: 'Email and password are required' };
+      }
+      if (email.length > 100 || password.length > 128) {
+        return { success: false, message: 'Invalid input' };
+      }
+
       const response = await authAPI.login({ email, password });
       const { token, user } = response.data;
       
@@ -73,6 +81,17 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
+      // ✅ ADDED: basic input validation before sending to API
+      if (!userData.email || !userData.password || !userData.name) {
+        return { success: false, message: 'Please fill in all required fields' };
+      }
+      if (userData.email.length > 100 || userData.password.length > 128) {
+        return { success: false, message: 'Invalid input' };
+      }
+      if (userData.password.length < 8) {
+        return { success: false, message: 'Password must be at least 8 characters' };
+      }
+
       const response = await authAPI.register(userData);
       const { token, user } = response.data;
       

@@ -76,11 +76,15 @@ export const announcementAPI = {
 };
 
 export const messagesAPI = {
-  getThreads:   ()                  => api.get('/messages/threads'),
-  getMessages:  (threadId)          => api.get(`/messages/${threadId}`),
-  send:         (threadId, message) => api.post(`/messages/${threadId}`, { message }),
-  getStaffList: ()                  => api.get('/messages/staff'),
-  markAsRead:   (threadId)          => api.put(`/messages/${threadId}/read`),
+  getThreads:         ()                         => api.get('/messages/threads'),
+  getMessages:        (threadId)                 => api.get(`/messages/${threadId}`),
+  send:               (threadId, message)        => api.post(`/messages/${threadId}`, { message }),
+  getStaffList:       ()                         => api.get('/messages/staff'),
+  markAsRead:         (threadId)                 => api.put(`/messages/${threadId}/read`),
+  editMessage:        (threadId, msgId, message) => api.put(`/messages/${threadId}/message/${msgId}`, { message }),
+  deleteMessage:      (threadId, msgId)          => api.delete(`/messages/${threadId}/message/${msgId}`),
+  deleteMessageForMe: (threadId, msgId)          => api.delete(`/messages/${threadId}/message/${msgId}/me`), // ✅ ADDED
+  deleteThread:       (threadId)                 => api.delete(`/messages/${threadId}`),
 };
 
 export const notificationsAPI = {

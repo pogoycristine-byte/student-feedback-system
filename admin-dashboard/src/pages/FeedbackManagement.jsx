@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { feedbackAPI, categoryAPI } from '../services/api';
-import { Search, Eye, Trash2, MessageSquare, Calendar, Filter, X, ChevronDown, Star, FileText } from 'lucide-react';
+import { Search, Eye, Trash2, MessageSquare, Calendar, Filter, X, ChevronDown, Star, FileText, Clock, User, ChevronRight } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { createPortal } from 'react-dom';
@@ -106,6 +106,21 @@ const STATUS_BUTTON_COLORS_LIGHT = {
   Rejected:       { bg: '#dc2626', border: '#b91c1c', color: '#ffffff' },
 };
 
+// ── Activity Log Status Colors ──
+const ACTIVITY_LOG_STATUS_COLORS = {
+  Pending:        { bg: 'rgba(234,179,8,0.15)',   border: 'rgba(234,179,8,0.35)',   color: '#fbbf24', dot: '#fbbf24' },
+  'Under Review': { bg: 'rgba(59,130,246,0.15)',  border: 'rgba(59,130,246,0.35)',  color: '#60a5fa', dot: '#60a5fa' },
+  Resolved:       { bg: 'rgba(16,185,129,0.15)',  border: 'rgba(16,185,129,0.35)',  color: '#34d399', dot: '#34d399' },
+  Rejected:       { bg: 'rgba(239,68,68,0.15)',   border: 'rgba(239,68,68,0.35)',   color: '#f87171', dot: '#f87171' },
+};
+
+const ACTIVITY_LOG_STATUS_COLORS_LIGHT = {
+  Pending:        { bg: 'rgba(217,119,6,0.1)',    border: 'rgba(217,119,6,0.35)',   color: '#92400e', dot: '#d97706' },
+  'Under Review': { bg: 'rgba(37,99,235,0.1)',    border: 'rgba(37,99,235,0.35)',   color: '#1d4ed8', dot: '#2563eb' },
+  Resolved:       { bg: 'rgba(5,150,105,0.1)',    border: 'rgba(5,150,105,0.35)',   color: '#065f46', dot: '#059669' },
+  Rejected:       { bg: 'rgba(220,38,38,0.1)',    border: 'rgba(220,38,38,0.35)',   color: '#991b1b', dot: '#dc2626' },
+};
+
 const resolveChangedBy = (changedBy) => {
   if (!changedBy) return { name: 'Unknown', role: 'admin' };
   if (typeof changedBy === 'object') {
@@ -170,6 +185,313 @@ const StudentAvatar = ({ src, name, size = 34 }) => {
   );
 };
 
+// ── Staff/Admin Avatar helper for activity log ──
+const StaffAvatar = ({ name, role, size = 30 }) => {
+  const initials = name
+    ? name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+    : '?';
+  const isAdmin = role === 'admin';
+  const colorPairs = isAdmin
+    ? ['#7c3aed', '#4c1d95']
+    : ['#0369a1', '#0c4a6e'];
+  return (
+    <div style={{
+      width: size, height: size,
+      borderRadius: '50%',
+      background: `linear-gradient(135deg, ${colorPairs[0]}, ${colorPairs[1]})`,
+      border: `2px solid ${isAdmin ? 'rgba(139,92,246,0.5)' : 'rgba(59,130,246,0.5)'}`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+      fontSize: size * 0.35, fontWeight: 700, color: '#fff',
+      letterSpacing: '0.5px',
+    }}>
+      {initials}
+    </div>
+  );
+};
+
+// ── Activity Log Modal ──
+const ActivityLogModal = ({ feedback, isLightMode, onClose }) => {
+  const [activityLog, setActivityLog] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchActivityLog = async () => {
+      try {
+        const response = await feedbackAPI.getActivityLog(feedback._id);
+        setActivityLog(response.data.activityLog || response.data.logs || []);
+      } catch (error) {
+        // Fallback: build from existing data if API doesn't have dedicated endpoint
+        const fallbackLog = [];
+        // Add creation entry
+        fallbackLog.push({
+          _id: 'created',
+          action: 'created',
+          status: 'Pending',
+          changedBy: feedback.student ? { name: feedback.student.name, role: 'student' } : { name: 'Student', role: 'student' },
+          timestamp: feedback.createdAt,
+          comment: null,
+        });
+        // Add status history entries if available
+        if (feedback.statusHistory && feedback.statusHistory.length > 0) {
+          feedback.statusHistory.forEach((entry, i) => {
+            fallbackLog.push({
+              _id: `history-${i}`,
+              action: 'status_changed',
+              status: entry.status,
+              previousStatus: entry.previousStatus,
+              changedBy: entry.changedBy,
+              timestamp: entry.changedAt || entry.timestamp,
+              comment: entry.comment,
+            });
+          });
+        } else if (feedback.lastUpdatedBy && feedback.status !== 'Pending') {
+          // At least show last update if no history
+          fallbackLog.push({
+            _id: 'last-update',
+            action: 'status_changed',
+            status: feedback.status,
+            previousStatus: null,
+            changedBy: feedback.lastUpdatedBy,
+            timestamp: feedback.updatedAt || feedback.createdAt,
+            comment: feedback.adminResponse?.comment || null,
+          });
+        }
+        setActivityLog(fallbackLog);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchActivityLog();
+  }, [feedback._id]);
+
+  const modalBg = isLightMode
+    ? { background: 'rgba(245,243,255,0.98)', border: '1px solid rgba(196,181,253,0.5)', boxShadow: '0 25px 60px rgba(109,40,217,0.2)' }
+    : { background: 'linear-gradient(145deg, #1a1025, #0f0a1a)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 25px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(109,40,217,0.2)' };
+
+  const getActionLabel = (entry) => {
+    if (entry.action === 'created') return 'Feedback submitted';
+    if (entry.action === 'status_changed') {
+      if (entry.previousStatus) return `Status changed`;
+      return `Status set to`;
+    }
+    if (entry.action === 'comment_added') return 'Response added';
+    return entry.action || 'Updated';
+  };
+
+  const getStatusColors = (status) => {
+    const colors = isLightMode ? ACTIVITY_LOG_STATUS_COLORS_LIGHT : ACTIVITY_LOG_STATUS_COLORS;
+    return colors[status] || { bg: 'rgba(107,114,128,0.15)', border: 'rgba(107,114,128,0.3)', color: isLightMode ? '#374151' : '#9ca3af', dot: '#9ca3af' };
+  };
+
+  const getRoleBadgeStyle = (role) => {
+    if (role === 'admin') return isLightMode
+      ? { bg: 'rgba(109,40,217,0.12)', color: '#5b21b6', border: 'rgba(109,40,217,0.3)' }
+      : { bg: 'rgba(139,92,246,0.2)', color: '#a78bfa', border: 'rgba(139,92,246,0.4)' };
+    if (role === 'staff') return isLightMode
+      ? { bg: 'rgba(37,99,235,0.1)', color: '#1d4ed8', border: 'rgba(37,99,235,0.3)' }
+      : { bg: 'rgba(59,130,246,0.2)', color: '#60a5fa', border: 'rgba(59,130,246,0.4)' };
+    return isLightMode
+      ? { bg: 'rgba(107,114,128,0.1)', color: '#374151', border: 'rgba(107,114,128,0.3)' }
+      : { bg: 'rgba(107,114,128,0.2)', color: '#9ca3af', border: 'rgba(107,114,128,0.4)' };
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 flex items-center justify-center z-[60] p-4"
+      style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="rounded-2xl w-full flex flex-col"
+        style={{ maxWidth: '520px', maxHeight: '80vh', ...modalBg }}
+      >
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-5 py-4 shrink-0"
+          style={{ borderBottom: isLightMode ? '1px solid rgba(196,181,253,0.4)' : '1px solid rgba(255,255,255,0.08)' }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center"
+              style={{ background: isLightMode ? 'rgba(109,40,217,0.1)' : 'rgba(139,92,246,0.15)', border: isLightMode ? '1px solid rgba(109,40,217,0.2)' : '1px solid rgba(139,92,246,0.3)' }}
+            >
+              <Clock size={16} style={{ color: isLightMode ? '#6d28d9' : '#a78bfa' }} />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold" style={{ color: isLightMode ? '#1e1b4b' : '#ffffff' }}>Activity Log</h3>
+              <p className="text-xs" style={{ color: isLightMode ? '#6b7280' : '#6b7280' }}>
+                {feedback.subject ? `"${feedback.subject}"` : 'Feedback history'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg transition-all hover:bg-white/10"
+            style={{ color: isLightMode ? '#6b7280' : '#6b7280' }}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <div className="w-8 h-8 rounded-full border-2 border-violet-500/30 border-t-violet-500 animate-spin" />
+              <p className="text-xs" style={{ color: isLightMode ? '#6b7280' : '#6b7280' }}>Loading activity log...</p>
+            </div>
+          ) : activityLog.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <div
+                className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                style={{ background: isLightMode ? 'rgba(109,40,217,0.08)' : 'rgba(255,255,255,0.05)', border: isLightMode ? '1px solid rgba(196,181,253,0.4)' : '1px solid rgba(255,255,255,0.1)' }}
+              >
+                <FileText size={20} style={{ color: isLightMode ? '#7c3aed' : '#6b7280' }} />
+              </div>
+              <p className="text-sm font-medium" style={{ color: isLightMode ? '#374151' : '#9ca3af' }}>No activity recorded yet</p>
+              <p className="text-xs text-center" style={{ color: isLightMode ? '#9ca3af' : '#4b5563' }}>Activity will appear here once staff or admins take action on this feedback.</p>
+            </div>
+          ) : (
+            <div className="relative">
+              {/* Timeline vertical line */}
+              <div
+                className="absolute left-[19px] top-0 bottom-0 w-px"
+                style={{ background: isLightMode ? 'rgba(196,181,253,0.5)' : 'rgba(255,255,255,0.08)' }}
+              />
+
+              <div className="space-y-1">
+                {activityLog.map((entry, index) => {
+                  const actor = resolveChangedBy(entry.changedBy);
+                  const statusColors = entry.status ? getStatusColors(entry.status) : null;
+                  const roleStyle = getRoleBadgeStyle(actor.role);
+                  const isFirst = index === 0;
+                  const isLast = index === activityLog.length - 1;
+
+                  return (
+                    <div key={entry._id || index} className="relative flex gap-4 pb-5">
+                      {/* Timeline dot */}
+                      <div className="relative z-10 shrink-0 mt-0.5">
+                        <div
+                          className="w-[10px] h-[10px] rounded-full border-2 mt-1"
+                          style={{
+                            background: isFirst
+                              ? (isLightMode ? '#7c3aed' : '#8b5cf6')
+                              : (statusColors?.dot || (isLightMode ? '#9ca3af' : '#4b5563')),
+                            borderColor: isLightMode ? 'rgba(245,243,255,0.98)' : '#0f0a1a',
+                            boxShadow: isFirst ? `0 0 0 3px ${isLightMode ? 'rgba(124,58,237,0.2)' : 'rgba(139,92,246,0.25)'}` : undefined,
+                            marginLeft: '14px',
+                          }}
+                        />
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0 pt-0">
+                        {/* Top row: actor + timestamp */}
+                        <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                          <StaffAvatar name={actor.name} role={actor.role} size={24} />
+                          <span className="text-sm font-semibold" style={{ color: isLightMode ? '#1e1b4b' : '#e5e7eb' }}>
+                            {actor.name}
+                          </span>
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold capitalize"
+                            style={{
+                              background: roleStyle.bg,
+                              color: roleStyle.color,
+                              border: `1px solid ${roleStyle.border}`,
+                            }}
+                          >
+                            {actor.role}
+                          </span>
+                          <span className="text-xs ml-auto shrink-0" style={{ color: isLightMode ? '#9ca3af' : '#4b5563' }}>
+                            {entry.timestamp
+                              ? new Date(entry.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                              : '—'
+                            }
+                          </span>
+                        </div>
+
+                        {/* Action card */}
+                        <div
+                          className="rounded-xl px-3 py-2.5"
+                          style={{
+                            background: isLightMode ? 'rgba(109,40,217,0.05)' : 'rgba(255,255,255,0.03)',
+                            border: isLightMode ? '1px solid rgba(196,181,253,0.35)' : '1px solid rgba(255,255,255,0.07)',
+                          }}
+                        >
+                          {/* Action row */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs" style={{ color: isLightMode ? '#6b7280' : '#6b7280' }}>
+                              {getActionLabel(entry)}
+                            </span>
+                            {entry.previousStatus && (
+                              <>
+                                <span
+                                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-semibold"
+                                  style={{
+                                    background: getStatusColors(entry.previousStatus).bg,
+                                    color: getStatusColors(entry.previousStatus).color,
+                                    border: `1px solid ${getStatusColors(entry.previousStatus).border}`,
+                                  }}
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: getStatusColors(entry.previousStatus).dot }} />
+                                  {entry.previousStatus}
+                                </span>
+                                <ChevronRight size={12} style={{ color: isLightMode ? '#9ca3af' : '#4b5563', flexShrink: 0 }} />
+                              </>
+                            )}
+                            {entry.status && (
+                              <span
+                                className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-semibold"
+                                style={{
+                                  background: statusColors.bg,
+                                  color: statusColors.color,
+                                  border: `1px solid ${statusColors.border}`,
+                                }}
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: statusColors.dot }} />
+                                {entry.status}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Comment */}
+                          {entry.comment && (
+                            <div
+                              className="mt-2 pt-2 text-xs italic leading-relaxed"
+                              style={{
+                                borderTop: isLightMode ? '1px solid rgba(196,181,253,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                                color: isLightMode ? '#374151' : '#9ca3af',
+                              }}
+                            >
+                              "{entry.comment}"
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div
+          className="px-5 py-3 shrink-0"
+          style={{ borderTop: isLightMode ? '1px solid rgba(196,181,253,0.4)' : '1px solid rgba(255,255,255,0.08)' }}
+        >
+          <p className="text-xs text-center" style={{ color: isLightMode ? '#9ca3af' : '#4b5563' }}>
+            {activityLog.length} {activityLog.length === 1 ? 'event' : 'events'} recorded
+          </p>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
 const FeedbackManagement = () => {
   const [feedback, setFeedback] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -189,14 +511,17 @@ const FeedbackManagement = () => {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [templates, setTemplates] = useState([]);
-  const [mounted, setMounted] = useState(false); // ← added
+  const [mounted, setMounted] = useState(false);
+
+  // ── Activity Log Modal state ──
+  const [showActivityLog, setShowActivityLog] = useState(false);
+  const [activityLogFeedback, setActivityLogFeedback] = useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
-  // ← added
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -361,6 +686,14 @@ const FeedbackManagement = () => {
         alert(`Failed to delete feedback: ${error.response?.data?.message || error.message}`);
       }
     }
+  };
+
+  // ── Open Activity Log ──
+  const handleOpenActivityLog = (feedbackItem, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setActivityLogFeedback(feedbackItem);
+    setShowActivityLog(true);
   };
 
   const clearDateFilter = () => { setDateFrom(''); setDateTo(''); };
@@ -782,10 +1115,21 @@ const FeedbackManagement = () => {
                     {isAdmin && (
                       <td className="px-6 py-4">
                         {item.lastUpdatedBy ? (
-                          <div>
-                            <p className="text-xs font-medium leading-tight" style={{ color: isLightMode ? '#111827' : '#ffffff', fontWeight: 600 }}>{item.lastUpdatedBy.name}</p>
-                            <p className="text-[10px] capitalize" style={{ color: isLightMode ? '#6b7280' : '#ffffff' }}>{item.lastUpdatedBy.role}</p>
-                          </div>
+                          <button
+                            onClick={(e) => handleOpenActivityLog(item, e)}
+                            className="group/log flex flex-col items-start text-left transition-all rounded-lg px-2 py-1.5 -mx-2 -my-1.5 hover:bg-white/5"
+                            title="View activity log"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-xs font-semibold leading-tight group-hover/log:text-violet-400 transition-colors" style={{ color: isLightMode ? '#111827' : '#ffffff', fontWeight: 600 }}>
+                                {item.lastUpdatedBy.name}
+                              </p>
+                              <Clock size={10} className="opacity-0 group-hover/log:opacity-100 transition-opacity text-violet-400 shrink-0" />
+                            </div>
+                            <p className="text-[10px] capitalize" style={{ color: isLightMode ? '#6b7280' : '#ffffff' }}>
+                              {item.lastUpdatedBy.role}
+                            </p>
+                          </button>
                         ) : (
                           <span className="text-gray-600 text-xs">—</span>
                         )}
@@ -841,7 +1185,7 @@ const FeedbackManagement = () => {
         </table>
       </div>
 
-      {/* ── Modal ── */}
+      {/* ── Main Detail Modal ── */}
       {mounted && showModal && selectedFeedback && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="feedback-modal rounded-2xl w-full flex flex-col"
@@ -909,16 +1253,60 @@ const FeedbackManagement = () => {
                     selectedFeedback.location ? { label: 'Location', value: `📍 ${selectedFeedback.location}` } : null,
                     selectedFeedback.dateTime ? { label: 'Class Date & Time', value: `🕐 ${selectedFeedback.dateTime}` } : null,
                     { label: 'Submitted', value: new Date(selectedFeedback.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) },
-                    selectedFeedback.lastUpdatedBy ? { label: 'Last Updated By', value: selectedFeedback.lastUpdatedBy?.name, badge: selectedFeedback.lastUpdatedBy?.role } : null,
+                    // ── Last Updated By: clickable in modal too ──
+                    selectedFeedback.lastUpdatedBy ? {
+                      label: 'Last Updated By',
+                      value: selectedFeedback.lastUpdatedBy?.name,
+                      badge: selectedFeedback.lastUpdatedBy?.role,
+                      isActivityLogTrigger: true,
+                    } : null,
                   ].filter(Boolean).map((field, i) => (
-                    <div key={i} className="rounded-lg px-3 py-2" style={{ background: isLightMode ? 'rgba(109,40,217,0.06)' : 'rgba(255,255,255,0.04)', border: isLightMode ? '1.5px solid #c4b5fd' : '1px solid rgba(255,255,255,0.08)' }}>
-                      <p className="text-[9px] uppercase tracking-widests font-semibold mb-0.5" style={{ color: isLightMode ? '#4c1d95' : '#6b7280' }}>{field.label}</p>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="text-sm font-medium leading-snug" style={{ color: isLightMode ? '#1e1b4b' : '#ffffff' }}>{field.value}</p>
-                        {field.badge && <span className="text-[10px] bg-violet-500/30 text-violet-300 px-1.5 py-0.5 rounded-full">{field.badge}</span>}
+                    field.isActivityLogTrigger ? (
+                      <button
+                        key={i}
+                        onClick={(e) => handleOpenActivityLog(selectedFeedback, e)}
+                        className="rounded-lg px-3 py-2 text-left w-full transition-all group/trigger"
+                        style={{
+                          background: isLightMode ? 'rgba(109,40,217,0.06)' : 'rgba(255,255,255,0.04)',
+                          border: isLightMode ? '1.5px solid #c4b5fd' : '1px solid rgba(255,255,255,0.08)',
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = isLightMode ? 'rgba(109,40,217,0.12)' : 'rgba(139,92,246,0.1)';
+                          e.currentTarget.style.border = isLightMode ? '1.5px solid rgba(109,40,217,0.5)' : '1px solid rgba(139,92,246,0.35)';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = isLightMode ? 'rgba(109,40,217,0.06)' : 'rgba(255,255,255,0.04)';
+                          e.currentTarget.style.border = isLightMode ? '1.5px solid #c4b5fd' : '1px solid rgba(255,255,255,0.08)';
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-[9px] uppercase tracking-widest font-semibold mb-0.5" style={{ color: isLightMode ? '#4c1d95' : '#6b7280' }}>
+                            {field.label}
+                          </p>
+                          <span className="text-[9px] flex items-center gap-0.5 opacity-0 group-hover/trigger:opacity-100 transition-opacity" style={{ color: isLightMode ? '#6d28d9' : '#a78bfa' }}>
+                            <Clock size={9} /> View Log
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-sm font-medium leading-snug group-hover/trigger:text-violet-400 transition-colors" style={{ color: isLightMode ? '#1e1b4b' : '#ffffff' }}>
+                            {field.value}
+                          </p>
+                          {field.badge && (
+                            <span className="text-[10px] bg-violet-500/30 text-violet-300 px-1.5 py-0.5 rounded-full capitalize">{field.badge}</span>
+                          )}
+                        </div>
+                      </button>
+                    ) : (
+                      <div key={i} className="rounded-lg px-3 py-2" style={{ background: isLightMode ? 'rgba(109,40,217,0.06)' : 'rgba(255,255,255,0.04)', border: isLightMode ? '1.5px solid #c4b5fd' : '1px solid rgba(255,255,255,0.08)' }}>
+                        <p className="text-[9px] uppercase tracking-widests font-semibold mb-0.5" style={{ color: isLightMode ? '#4c1d95' : '#6b7280' }}>{field.label}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-sm font-medium leading-snug" style={{ color: isLightMode ? '#1e1b4b' : '#ffffff' }}>{field.value}</p>
+                          {field.badge && <span className="text-[10px] bg-violet-500/30 text-violet-300 px-1.5 py-0.5 rounded-full">{field.badge}</span>}
+                        </div>
+                        {field.sub && <p className="text-xs mt-0.5 italic" style={{ color: isLightMode ? '#6b7280' : '#9ca3af' }}>{field.sub}</p>}
                       </div>
-                      {field.sub && <p className="text-xs mt-0.5 italic" style={{ color: isLightMode ? '#6b7280' : '#9ca3af' }}>{field.sub}</p>}
-                    </div>
+                    )
                   ))}
                 </div>
 
@@ -1007,6 +1395,15 @@ const FeedbackManagement = () => {
           </div>
         </div>,
         document.body
+      )}
+
+      {/* ── Activity Log Modal ── */}
+      {mounted && showActivityLog && activityLogFeedback && (
+        <ActivityLogModal
+          feedback={activityLogFeedback}
+          isLightMode={isLightMode}
+          onClose={() => { setShowActivityLog(false); setActivityLogFeedback(null); }}
+        />
       )}
     </div>
   );

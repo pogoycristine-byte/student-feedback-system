@@ -7,6 +7,8 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   ResponsiveContainer, Tooltip
 } from 'recharts';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 /* ── Animated Icons (same as Dashboard) ── */
 const IconFeedback = () => (
@@ -201,6 +203,7 @@ const ReportsAnalytics = () => {
   const isAdmin = user?.role === 'admin';
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   // ── Rating stats state ──
   const [ratingStats, setRatingStats] = useState({
@@ -243,12 +246,370 @@ const ReportsAnalytics = () => {
         totalRated: rated.length,
         totalResolved: resolved.length,
         distribution,
-        ratedList: rated, // full list for detailed breakdown
+        ratedList: rated,
       });
     } catch (error) {
       console.error('Error fetching rating stats:', error);
     }
   };
+
+  // ── PDF Export ────────────────────────────────────────────────────────────
+  const handleExportPDF = () => {
+    if (!analytics) return;
+    setExporting(true);
+
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageW  = doc.internal.pageSize.getWidth();
+      const pageH  = doc.internal.pageSize.getHeight();
+      const margin = 14;
+      let y = 0;
+
+      // ── Colours ──
+      const VIOLET  = [124, 58, 237];
+      const PINK    = [219, 39, 119];
+      const AMBER   = [245, 158, 11];
+      const GREEN   = [5, 150, 105];
+      const BLUE    = [37, 99, 235];
+      const RED     = [220, 38, 38];
+      const GRAY_BG = [245, 245, 250];
+      const GRAY_LN = [220, 220, 230];
+      const WHITE   = [255, 255, 255];
+      const DARK    = [30, 27, 75];
+
+      const RATING_COLORS_PDF = { 5: GREEN, 4: [16, 185, 129], 3: AMBER, 2: [249, 115, 22], 1: RED };
+      const RATING_LABELS_PDF = { 5: 'Very Satisfied', 4: 'Satisfied', 3: 'Neutral', 2: 'Unsatisfied', 1: 'Very Unsatisfied' };
+      const CAT_COLORS = [
+        [139, 92, 246], [236, 72, 153], [245, 158, 11],
+        [16, 185, 129], [59, 130, 246], [239, 68, 68],
+      ];
+
+      const ensureSpace = (needed) => {
+        if (y + needed > pageH - 14) { doc.addPage(); y = 14; }
+      };
+
+      const sectionHeader = (title) => {
+        ensureSpace(12);
+        doc.setFillColor(...VIOLET);
+        doc.roundedRect(margin, y, pageW - margin * 2, 9, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(...WHITE);
+        doc.text(title, margin + 4, y + 6.2);
+        doc.setTextColor(...DARK);
+        y += 13;
+      };
+
+      const dotPDF = (x, cy, color) => {
+        doc.setFillColor(...color);
+        doc.circle(x, cy, 1.5, 'F');
+      };
+
+      // ── Cover header ──
+      doc.setFillColor(...VIOLET);
+      doc.rect(0, 0, pageW, 38, 'F');
+      doc.setFillColor(...PINK);
+      doc.setGState(new doc.GState({ opacity: 0.35 }));
+      doc.rect(pageW / 2, 0, pageW / 2, 38, 'F');
+      doc.setGState(new doc.GState({ opacity: 1 }));
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(20);
+      doc.setTextColor(...WHITE);
+      doc.text('Reports & Analytics', margin, 18);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text('Student Feedback System  ·  ClassBack', margin, 26);
+
+      const now = new Date();
+      doc.text(
+        `Generated: ${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}  ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        margin, 33
+      );
+      doc.setTextColor(...DARK);
+      y = 46;
+
+      // ── 1. METRIC CARDS ──
+      sectionHeader('Key Metrics');
+
+      const { totalFeedback, statusCounts, resolutionRate, averageResolutionTime, feedbackByCategory } = analytics || {};
+
+      const metricsData = [
+        { label: 'Total Feedback',   value: totalFeedback || 0,         color: VIOLET, sub: 'All submissions' },
+        { label: 'Pending Feedback', value: statusCounts?.Pending || 0, color: AMBER,  sub: 'Awaiting review' },
+        { label: 'Resolved',         value: statusCounts?.Resolved || 0,color: GREEN,  sub: 'Successfully closed' },
+        { label: 'Resolution Rate',  value: `${resolutionRate || 0}%`,  color: PINK,   sub: 'Of all feedback' },
+      ];
+
+      const cardW = (pageW - margin * 2 - 6) / 4;
+      const cardH = 22;
+
+      metricsData.forEach((m, i) => {
+        const x = margin + i * (cardW + 2);
+        doc.setFillColor(...GRAY_BG);
+        doc.roundedRect(x, y, cardW, cardH, 2, 2, 'F');
+        doc.setFillColor(...m.color);
+        doc.roundedRect(x, y, 2, cardH, 1, 1, 'F');
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(100, 100, 120);
+        doc.text(m.label.toUpperCase(), x + 5, y + 6);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.setTextColor(...m.color);
+        doc.text(String(m.value), x + 5, y + 15);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6.5);
+        doc.setTextColor(150, 150, 170);
+        doc.text(m.sub, x + 5, y + 20);
+      });
+
+      doc.setTextColor(...DARK);
+      y += cardH + 10;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 120);
+      doc.text(`Under Review: ${statusCounts?.['Under Review'] || 0}`, margin, y);
+      doc.text(`Rejected: ${statusCounts?.Rejected || 0}`, margin + 50, y);
+      doc.text(`Avg Resolution Time: ${averageResolutionTime || 0} days`, margin + 100, y);
+      doc.setTextColor(...DARK);
+      y += 10;
+
+      // ── 2. STATUS DISTRIBUTION ──
+      sectionHeader('Status Distribution');
+
+      const statusRawPDF = [
+        { label: 'Pending',      value: statusCounts?.Pending || 0,          color: AMBER },
+        { label: 'Under Review', value: statusCounts?.['Under Review'] || 0, color: BLUE  },
+        { label: 'Resolved',     value: statusCounts?.Resolved || 0,         color: GREEN },
+        { label: 'Rejected',     value: statusCounts?.Rejected || 0,         color: RED   },
+      ];
+      const totalStatusPDF = statusRawPDF.reduce((s, d) => s + d.value, 0) || 1;
+
+      // Stacked bar
+      const barH = 8;
+      const barW = pageW - margin * 2;
+      let bx = margin;
+      statusRawPDF.forEach(seg => {
+        const w = (seg.value / totalStatusPDF) * barW;
+        if (w > 0) {
+          doc.setFillColor(...seg.color);
+          doc.rect(bx, y, w, barH, 'F');
+          bx += w;
+        }
+      });
+      y += barH + 4;
+
+      // Legend
+      let lx = margin;
+      statusRawPDF.forEach(seg => {
+        const pct = ((seg.value / totalStatusPDF) * 100).toFixed(0);
+        dotPDF(lx + 1.5, y + 1, seg.color);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...DARK);
+        doc.text(`${seg.label}: ${seg.value} (${pct}%)`, lx + 5, y + 2.5);
+        lx += 46;
+      });
+      y += 10;
+
+      // ── 3. FEEDBACK BY CATEGORY (bars) ──
+      if (feedbackByCategory && feedbackByCategory.length > 0) {
+        sectionHeader('Feedback by Category');
+
+        const total = totalFeedback || 1;
+        const barMaxW = pageW - margin * 2 - 72;
+
+        feedbackByCategory.forEach((cat, i) => {
+          ensureSpace(10);
+          const color = CAT_COLORS[i % CAT_COLORS.length];
+          const pct = ((cat.count / total) * 100);
+          const barFill = (pct / 100) * barMaxW;
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8.5);
+          doc.setTextColor(...DARK);
+          const name = cat.categoryName || 'Unknown';
+          doc.text(name.length > 28 ? name.slice(0, 27) + '…' : name, margin, y + 3.5);
+
+          doc.setFillColor(230, 230, 240);
+          doc.roundedRect(margin + 55, y, barMaxW, 5, 1, 1, 'F');
+
+          doc.setFillColor(...color);
+          if (barFill > 0) doc.roundedRect(margin + 55, y, barFill, 5, 1, 1, 'F');
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(100, 100, 120);
+          doc.text(`${cat.count}  (${pct.toFixed(1)}%)`, margin + 55 + barMaxW + 3, y + 4);
+          y += 9;
+        });
+        y += 4;
+      }
+
+      // ── 4. SATISFACTION RATINGS ──
+      sectionHeader('Student Satisfaction Ratings');
+
+      const { averageRating, totalRated, totalResolved, distribution } = ratingStats;
+
+      // Big score
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(28);
+      doc.setTextColor(...AMBER);
+      doc.text(averageRating > 0 ? averageRating.toFixed(1) : '—', margin, y + 14);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(...DARK);
+      const avgLabel = RATING_LABELS_PDF[Math.round(averageRating)] || '';
+      doc.text(avgLabel, margin + 20, y + 6);
+      doc.setFontSize(8);
+      doc.setTextColor(120, 120, 140);
+      doc.text(`${totalRated || 0} of ${totalResolved || 0} resolved feedbacks rated`, margin + 20, y + 12);
+
+      // Stars
+      doc.setFontSize(12);
+      doc.setTextColor(...AMBER);
+      const fullStars = Math.round(averageRating || 0);
+      doc.text('★'.repeat(fullStars) + '☆'.repeat(5 - fullStars), margin + 20, y + 19);
+      doc.setTextColor(...DARK);
+      y += 26;
+
+      // Distribution bars 5 → 1
+      const distBarMaxW = pageW - margin * 2 - 62;
+      [5, 4, 3, 2, 1].forEach(n => {
+        ensureSpace(9);
+        const count = distribution?.[n] || 0;
+        const pct   = totalRated > 0 ? (count / totalRated) * 100 : 0;
+        const color = RATING_COLORS_PDF[n];
+        const fill  = (pct / 100) * distBarMaxW;
+
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...color);
+        doc.text('★'.repeat(n) + '☆'.repeat(5 - n), margin, y + 4);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(100, 100, 120);
+        doc.text(RATING_LABELS_PDF[n], margin + 18, y + 4);
+
+        doc.setFillColor(230, 230, 240);
+        doc.roundedRect(margin + 46, y, distBarMaxW, 5, 1, 1, 'F');
+        doc.setFillColor(...color);
+        if (fill > 0) doc.roundedRect(margin + 46, y, fill, 5, 1, 1, 'F');
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(...DARK);
+        doc.text(`${count}  ${pct.toFixed(0)}%`, margin + 46 + distBarMaxW + 3, y + 4);
+        y += 8;
+      });
+      doc.setTextColor(...DARK);
+      y += 6;
+
+      // ── 5. INDIVIDUAL RATINGS TABLE ──
+      if (ratingStats.ratedList && ratingStats.ratedList.length > 0) {
+        sectionHeader('Individual Student Ratings');
+
+        const tableRows = [...ratingStats.ratedList]
+          .sort((a, b) => b.satisfactionRating - a.satisfactionRating)
+          .map(f => [
+            f.student?.name || 'Unknown',
+            f.subject || '—',
+            '★'.repeat(f.satisfactionRating) + '☆'.repeat(5 - f.satisfactionRating),
+            RATING_LABELS_PDF[f.satisfactionRating] || '—',
+            f.satisfactionComment
+              ? `"${f.satisfactionComment.slice(0, 55)}${f.satisfactionComment.length > 55 ? '…' : ''}"`
+              : '—',
+            f.ratedAt
+              ? new Date(f.ratedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+              : '—',
+          ]);
+
+        autoTable(doc, {
+          startY: y,
+          head: [['Student', 'Subject', 'Stars', 'Label', 'Comment', 'Date']],
+          body: tableRows,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 7.5, cellPadding: 2.5, textColor: DARK, lineColor: GRAY_LN, lineWidth: 0.2 },
+          headStyles: { fillColor: VIOLET, textColor: WHITE, fontStyle: 'bold', fontSize: 8 },
+          alternateRowStyles: { fillColor: GRAY_BG },
+          columnStyles: {
+            0: { cellWidth: 30 },
+            1: { cellWidth: 36 },
+            2: { cellWidth: 18, textColor: [...AMBER] },
+            3: { cellWidth: 26 },
+            4: { cellWidth: 50 },
+            5: { cellWidth: 22 },
+          },
+        });
+        y = doc.lastAutoTable.finalY + 8;
+      }
+
+      // ── 6. CATEGORY BREAKDOWN TABLE ──
+      if (feedbackByCategory && feedbackByCategory.length > 0) {
+        ensureSpace(20);
+        sectionHeader('Category Breakdown');
+
+        const total2 = totalFeedback || 1;
+        const catRows = feedbackByCategory.map(cat => {
+          const share = ((cat.count / total2) * 100).toFixed(1);
+          return [cat.categoryName || 'Unknown', cat.count, `${share}%`];
+        });
+
+        autoTable(doc, {
+          startY: y,
+          head: [['Category', 'Submissions', 'Share (%)']],
+          body: catRows,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 8.5, cellPadding: 3, textColor: DARK, lineColor: GRAY_LN, lineWidth: 0.2 },
+          headStyles: { fillColor: VIOLET, textColor: WHITE, fontStyle: 'bold', fontSize: 9 },
+          alternateRowStyles: { fillColor: GRAY_BG },
+          columnStyles: {
+            0: { cellWidth: 80 },
+            1: { cellWidth: 40, halign: 'center', fontStyle: 'bold' },
+            2: { cellWidth: 40, halign: 'center' },
+          },
+        });
+      }
+
+      // ── Footer on every page ──
+      const totalPages = doc.internal.getNumberOfPages();
+      for (let p = 1; p <= totalPages; p++) {
+        doc.setPage(p);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(160, 160, 180);
+        doc.setDrawColor(...GRAY_LN);
+        doc.line(margin, pageH - 10, pageW - margin, pageH - 10);
+        doc.text('ClassBack — Student Feedback System', margin, pageH - 5);
+        doc.text(`Page ${p} of ${totalPages}`, pageW - margin, pageH - 5, { align: 'right' });
+      }
+
+      // ── Save ──
+      // ── Save ──
+      const fileName = `analytics-report-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}.pdf`;
+      const blob = doc.output('blob');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+    } catch (err) {
+      console.error('PDF export error:', err);
+      alert('Failed to export PDF. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -294,13 +655,39 @@ const ReportsAnalytics = () => {
       {/* Header */}
       <div className="flex items-end justify-between">
         <div>
-         
           <h1 className="text-3xl font-bold text-white">Reports & Analytics</h1>
           <p className="text-gray-400 text-sm mt-1">Key metrics and feedback breakdown at a glance.</p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-gray-400 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5">
-          <BarChart2 className="w-4 h-4 text-violet-400" />
-          Live data
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-gray-400 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5">
+            <BarChart2 className="w-4 h-4 text-violet-400" />
+            Live data
+          </div>
+          <button
+            onClick={handleExportPDF}
+            disabled={exporting}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white border border-violet-500/40 transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: 'linear-gradient(135deg, #7c3aed, #db2777)', boxShadow: '0 4px 16px rgba(124,58,237,0.35)' }}
+          >
+            {exporting ? (
+              <>
+                <svg className="animate-spin" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/>
+                </svg>
+                Exporting...
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Export PDF
+              </>
+            )}
+          </button>
         </div>
       </div>
 

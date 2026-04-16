@@ -30,6 +30,23 @@ const PrivateRoute = ({ children }) => {
   return user ? children : <Navigate to="/login" />;
 };
 
+// ✅ ADDED: admin-only route guard — redirects staff away from admin-only pages
+const AdminRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-app-gradient">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-500"></div>
+      </div>
+    );
+  }
+
+  if (!user) return <Navigate to="/login" />;
+  if (user.role !== 'admin') return <Navigate to="/dashboard" />;
+  return children;
+};
+
 const AppLayout = ({ children }) => {
   return (
     <div className="flex h-screen bg-app-gradient">
@@ -69,25 +86,27 @@ function App() {
               }
             />
 
+            {/* ✅ ADDED: AdminRoute — only admin can manage categories */}
             <Route
               path="/categories"
               element={
-                <PrivateRoute>
+                <AdminRoute>
                   <AppLayout>
                     <Categories />
                   </AppLayout>
-                </PrivateRoute>
+                </AdminRoute>
               }
             />
 
+            {/* ✅ ADDED: AdminRoute — only admin can manage students */}
             <Route
               path="/students"
               element={
-                <PrivateRoute>
+                <AdminRoute>
                   <AppLayout>
                     <Students />
                   </AppLayout>
-                </PrivateRoute>
+                </AdminRoute>
               }
             />
 
@@ -102,14 +121,15 @@ function App() {
               }
             />
 
+            {/* ✅ ADDED: AdminRoute — only admin can access system settings */}
             <Route
               path="/settings"
               element={
-                <PrivateRoute>
+                <AdminRoute>
                   <AppLayout>
                     <SystemSettings />
                   </AppLayout>
-                </PrivateRoute>
+                </AdminRoute>
               }
             />
 
@@ -157,7 +177,6 @@ function App() {
               }
             />
 
-            {/* Messages route — admin to staff direct messaging */}
             <Route
               path="/messages"
               element={

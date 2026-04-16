@@ -44,7 +44,8 @@ export const AuthProvider = ({ children }) => {
     };
 
     ping();
-    heartbeatRef.current = setInterval(ping, 5 * 1000); // ← Every 5 seconds
+    // ✅ CHANGED: increased from 5 seconds to 30 seconds to reduce request volume
+    heartbeatRef.current = setInterval(ping, 30 * 1000);
 
     return () => {
       if (heartbeatRef.current) {
@@ -56,8 +57,21 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
+      // ✅ ADDED: basic input validation before sending to API
+      if (!email || !password) {
+        return { success: false, message: 'Email and password are required' };
+      }
+      if (email.length > 100 || password.length > 128) {
+        return { success: false, message: 'Invalid input' };
+      }
+
       const response = await authAPI.login({ email, password });
       const { token, user } = response.data;
+
+      // ✅ ADDED: make sure the user role is admin or staff — block students
+      if (user.role === 'student') {
+        return { success: false, message: 'Access denied. Students cannot access the admin dashboard.' };
+      }
 
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
@@ -75,7 +89,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    localStorage.setItem('fromLogout', 'true'); // ← tells Login to skip landing page
+    localStorage.setItem('fromLogout', 'true');
     setUser(null);
   };
 

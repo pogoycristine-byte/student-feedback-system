@@ -181,24 +181,24 @@ const NotificationBell = ({ isLightMode }) => {
       </button>
 
       {/* ── Dropdown Panel ── */}
-      {open && (
-        <div style={{
-          position: 'fixed',
-          top: '58px',
-          right: '24px',
-          width: '360px',
-          maxHeight: '480px',
-          borderRadius: '16px',
-          background: panelBg,
-          border: panelBorder,
-          boxShadow: isLightMode
-            ? '0 20px 60px rgba(109,40,217,0.15)'
-            : '0 20px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(124,58,237,0.2)',
-          zIndex: 9999,
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
+     {open && (
+  <div style={{
+    position: 'absolute',
+    top: 'calc(100% + 8px)',
+    left: '0',
+    width: '360px',
+    maxHeight: '480px',
+    borderRadius: '16px',
+    background: panelBg,
+    border: panelBorder,
+    boxShadow: isLightMode
+      ? '0 20px 60px rgba(109,40,217,0.15)'
+      : '0 20px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(124,58,237,0.2)',
+    zIndex: 9999,
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+  }}>
 
           {/* Header */}
           <div style={{

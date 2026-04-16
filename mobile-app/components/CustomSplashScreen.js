@@ -1,10 +1,18 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { height } = Dimensions.get('window');
 
-const CustomSplashScreen = () => {
+const CustomSplashScreen = ({ onFinish }) => {
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (onFinish) onFinish();
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <LinearGradient
       colors={['#1a1a2e', '#3b1a6e', '#6b1f6e', '#7b1f5e', '#4a1a5e', '#1a1a2e']}
@@ -13,13 +21,10 @@ const CustomSplashScreen = () => {
       end={{ x: 0.8, y: 1 }}
       style={styles.container}
     >
-      {/* Top section - FordaGors + ClassBack */}
       <View style={styles.topSection}>
         <Text style={styles.fordaGors}>Forda Gors</Text>
         <Text style={styles.classBack}>ClassBack</Text>
       </View>
-
-      {/* Bottom - version */}
       <Text style={styles.version}>version 1.0.0</Text>
     </LinearGradient>
   );

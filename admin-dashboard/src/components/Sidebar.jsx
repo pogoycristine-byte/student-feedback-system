@@ -131,15 +131,6 @@ const injectStyles = () => {
     .sb-scrollbar::-webkit-scrollbar { width: 3px; }
     .sb-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .sb-scrollbar::-webkit-scrollbar-thumb { background: rgba(167,139,250,0.2); border-radius: 99px; }
-    .sb-bell-wrap {
-      opacity: 0;
-      pointer-events: none;
-    }
-    .sb-bell-wrap.ready {
-      opacity: 1;
-      pointer-events: auto;
-      transition: opacity 0.25s ease;
-    }
   `;
   document.head.appendChild(style);
 };
@@ -275,30 +266,6 @@ const Sidebar = () => {
 
   // authController returns { id, name, role, ... } — NOT _id.
   const userId = String(user?.id || user?._id || '');
-
-  const bellPosition = {
-    '/dashboard':    { top: '38px', right: '281px' },
-    '/announcements':{ top: '38px', right: '395px'  },
-    '/messages':     { top: '24px', right: '24px'  },
-    '/feedback':     { top: '48px', right: '220px'  },
-    '/categories':   { top: '46px', right: '360px'  },
-    '/students':     { top: '42px', right: '454px'  },
-    '/reports':      { top: '46px', right: '160px'  },
-    '/settings':     { top: '40px', right: '160px'  },
-    '/staff/manage': { top: '38px', right: '149px'  },
-    '/schedules':    { top: '24px', right: '24px'  },
-  };
-  const currentBell = bellPosition[location.pathname] || { top: '24px', right: '24px' };
-
-  const [bellReady, setBellReady] = useState(false);
-  useEffect(() => {
-    setBellReady(false);
-    const raf1 = requestAnimationFrame(() => {
-      const raf2 = requestAnimationFrame(() => setBellReady(true));
-      return () => cancelAnimationFrame(raf2);
-    });
-    return () => cancelAnimationFrame(raf1);
-  }, [location.pathname]);
 
   const [newFeedbackCount, setNewFeedbackCount] = useState(0);
   const [unreadChatCount, setUnreadChatCount]   = useState(0);
@@ -532,6 +499,8 @@ const Sidebar = () => {
       }}>
         <Logo />
         <div style={{ borderTop: '1px solid rgba(167,139,250,0.12)', margin: '14px 0 10px' }} />
+
+        {/* ── User info row with inline NotificationBell ── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <p style={{
@@ -553,7 +522,8 @@ const Sidebar = () => {
               }}>
                 {user?.name}
               </span>
-              {user?.role && (
+              {/* ── Role badge hidden for admin to prevent name wrapping ── */}
+              {user?.role && !isAdmin && (
                 <span style={{
                   fontFamily: "'DM Mono', monospace",
                   fontSize: '9px',
@@ -570,6 +540,12 @@ const Sidebar = () => {
               )}
             </div>
           </div>
+
+          {/* ── Notification Bell sits here, inside the sidebar ── */}
+         {/* ── Notification Bell sits here, inside the sidebar ── */}
+<div style={{ marginTop: '6px' }}>
+  <NotificationBell isLightMode={lightMode} />
+</div>
         </div>
       </div>
 
@@ -613,20 +589,6 @@ const Sidebar = () => {
           <LogOut style={{ width: '14px', height: '14px', flexShrink: 0 }} />
           <span>Logout</span>
         </button>
-      </div>
-
-      {/* ── Fixed Notification Bell ── */}
-      <div
-        className={`sb-bell-wrap${bellReady ? ' ready' : ''}`}
-        style={{
-          position: 'fixed',
-          top: currentBell.top,
-          right: currentBell.right,
-          zIndex: 9999,
-          transition: 'right 0.2s ease, top 0.2s ease',
-        }}
-      >
-        <NotificationBell isLightMode={lightMode} />
       </div>
     </div>
   );

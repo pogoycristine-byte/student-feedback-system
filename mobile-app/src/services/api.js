@@ -29,6 +29,7 @@ api.interceptors.response.use(
   async (error) => {
     if (error.response?.status === 401) {
       await SecureStore.deleteItemAsync('token');
+      await SecureStore.deleteItemAsync('user');
     }
     return Promise.reject(error);
   }
@@ -63,10 +64,17 @@ export const feedbackAPI = {
     form.append('location', data.location || 'TMC Main Campus');
     form.append('dateTime', data.dateTime || '');
 
-    mediaFiles.forEach((file, index) => {
+    // ✅ ADDED: limit media files to 5 max before sending
+    const limitedFiles = mediaFiles.slice(0, 5);
+
+    limitedFiles.forEach((file, index) => {
       const isVideo = file.type === 'video' || file.mimeType?.startsWith('video/');
       const mimeType = file.mimeType || (isVideo ? 'video/mp4' : 'image/jpeg');
       const extension = file.uri.split('?')[0].split('.').pop() || (isVideo ? 'mp4' : 'jpg');
+
+      // ✅ ADDED: only allow safe extensions
+      const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov'];
+      if (!allowedExtensions.includes(extension.toLowerCase())) return;
 
       form.append('media', {
         uri: file.uri,

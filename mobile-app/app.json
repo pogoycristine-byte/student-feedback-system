@@ -9,16 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash.png",
-      "resizeMode": "cover",
       "backgroundColor": "#1a1a2e"
     },
     "ios": {
       "supportsTablet": true,
       "splash": {
-        
-        "image": "./assets/images/splash.png",
-        "resizeMode": "cover",
         "backgroundColor": "#1a1a2e"
       }
     },
@@ -32,8 +27,6 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.pogoycristine.classback",
       "splash": {
-        "image": "./assets/images/splash.png",
-        "resizeMode": "cover",
         "backgroundColor": "#1a1a2e"
       }
     },
@@ -46,9 +39,6 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash.png",
-          "imageWidth": 1080,
-          "resizeMode": "cover",
           "backgroundColor": "#1a1a2e"
         }
       ],

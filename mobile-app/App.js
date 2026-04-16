@@ -5,11 +5,10 @@ import { ActivityIndicator, View, StatusBar } from 'react-native';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 
-// Prevent the native Expo splash from hiding automatically
-// It will be hidden immediately when our custom splash mounts
 ExpoSplashScreen.preventAutoHideAsync();
 
 // Import Screens
+import CustomSplashScreen from './components/CustomSplashScreen';
 import SplashScreen from './src/screens/SplashScreen';
 import FeedbackDetailScreen from './src/screens/FeedbackDetailScreen';
 import HomeScreen from './src/screens/HomeScreen';
@@ -32,22 +31,27 @@ const Stack = createStackNavigator();
 
 const Navigation = () => {
   const { user, loading } = useAuth();
-  const [showSplash, setShowSplash] = useState(true);
+  const [step, setStep] = useState('custom');
   const [authReady, setAuthReady] = useState(false);
 
-  // Wait for auth to be ready
   useEffect(() => {
     if (!loading) {
       setAuthReady(true);
     }
   }, [loading]);
 
-  // Show splash screen first
-  if (showSplash) {
-    return <SplashScreen onFinish={() => setShowSplash(false)} />;
+  // Step 1: CustomSplashScreen — hide native splash immediately when it mounts
+  if (step === 'custom') {
+    ExpoSplashScreen.hideAsync();
+    return <CustomSplashScreen onFinish={() => setStep('animated')} />;
   }
 
-  // Show loading after splash while auth loads
+  // Step 2: Animated SplashScreen with Lottie + countdown
+  if (step === 'animated') {
+    return <SplashScreen onFinish={() => setStep('app')} />;
+  }
+
+  // Step 3: Loading while auth resolves
   if (!authReady) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a0b2e' }}>
@@ -56,6 +60,7 @@ const Navigation = () => {
     );
   }
 
+  // Step 4: Main App
   return (
     <NavigationContainer>
       <Stack.Navigator

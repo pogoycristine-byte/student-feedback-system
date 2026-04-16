@@ -6,6 +6,11 @@ import {
   Circle,
   ChevronLeft,
   User,
+  Trash2,
+  Pencil,
+  Check,
+  X,
+  MoreHorizontal,
 } from 'lucide-react';
 import { messagesAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +24,25 @@ const fmt = (iso) => {
   if (isToday) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
+
+// ── Stores { threadId -> lastSeenMessageId } persisted across refreshes ──
+const DIVIDER_CACHE_KEY = 'msg_divider_cache';
+
+const loadDividerCache = () => {
+  try {
+    return JSON.parse(localStorage.getItem(DIVIDER_CACHE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+};
+
+const saveDividerCache = (cache) => {
+  try {
+    localStorage.setItem(DIVIDER_CACHE_KEY, JSON.stringify(cache));
+  } catch {}
+};
+
+const shownDividerCache = loadDividerCache();
 
 const MessagesPage = () => {
   const { user } = useAuth();
@@ -43,9 +67,18 @@ const MessagesPage = () => {
   const [newIdsSnapshot, setNewIdsSnapshot] = useState(new Set());
   const [optimisticRead, setOptimisticRead] = useState(new Set());
 
-  const bottomRef    = useRef(null);
-  const pollRef      = useRef(null);
-  const unreadDivRef = useRef(null);
+  // ── Edit / Delete state ──
+  const [hoveredMsgId, setHoveredMsgId]   = useState(null);
+  const [editingMsgId, setEditingMsgId]   = useState(null);
+  const [editingText, setEditingText]     = useState('');
+  const [menuOpenId, setMenuOpenId]       = useState(null);
+
+  const bottomRef       = useRef(null);
+  const pollRef         = useRef(null);
+  const unreadDivRef    = useRef(null);
+  const isFreshOpenRef  = useRef(false);
+  const unreadTimerRef  = useRef(null);
+  const shownDividerRef = useRef(shownDividerCache);
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -53,6 +86,13 @@ const MessagesPage = () => {
     });
     observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
+  }, []);
+
+  // ── Close menu on outside click ──
+  useEffect(() => {
+    const handler = () => setMenuOpenId(null);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
   }, []);
 
   const loadList = useCallback(async () => {
@@ -80,7 +120,6 @@ const MessagesPage = () => {
 
   useEffect(() => { loadList(); }, [loadList]);
 
-  // ── Build sidebar items ──
   const sidebarItems = staffList
     .map((s) => {
       const thread   = threads.find(t =>
@@ -112,13 +151,10 @@ const MessagesPage = () => {
 
   const totalUnread = sidebarItems.filter(s => s.isUnread).length;
 
-  // ── Compute which message _ids are "new" to show the divider ──
-  // Only messages AFTER the user's last sent message count as unread.
   const computeNewIds = useCallback((msgs) => {
     const currentUser = userRef.current;
     if (!msgs.length) return new Set();
 
-    // Find the index of the last message the current user sent
     let lastMineIdx = -1;
     for (let i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].senderName === currentUser?.name) {
@@ -127,8 +163,6 @@ const MessagesPage = () => {
       }
     }
 
-    // If user never replied, no unread divider needed (nothing to separate)
-    // Only show divider for messages that arrived after their last reply
     if (lastMineIdx === -1) return new Set();
 
     return new Set(
@@ -143,7 +177,30 @@ const MessagesPage = () => {
     try {
       const res  = await messagesAPI.getMessages(id);
       const msgs = res.data.messages || [];
-      setNewIdsSnapshot(computeNewIds(msgs));
+
+      if (isFreshOpenRef.current) {
+        isFreshOpenRef.current = false;
+
+        const threadKey    = String(id);
+        const lastSeenId   = shownDividerRef.current[threadKey];
+        const newIds       = computeNewIds(msgs);
+        const lastMsg      = msgs[msgs.length - 1];
+        const lastMsgId    = lastMsg ? String(lastMsg._id) : null;
+        const hasNewToShow = newIds.size > 0 && lastMsgId !== lastSeenId;
+
+        if (hasNewToShow) {
+          shownDividerRef.current[threadKey] = lastMsgId;
+          saveDividerCache(shownDividerRef.current); // ── persist so refresh doesn't re-show divider ──
+          setNewIdsSnapshot(newIds);
+          if (unreadTimerRef.current) clearTimeout(unreadTimerRef.current);
+          unreadTimerRef.current = setTimeout(() => {
+            setNewIdsSnapshot(new Set());
+          }, 5000);
+        } else {
+          setNewIdsSnapshot(new Set());
+        }
+      }
+
       setMessages(msgs);
       await messagesAPI.markAsRead(id);
       window.dispatchEvent(new Event('adminReadDm'));
@@ -158,11 +215,22 @@ const MessagesPage = () => {
     setIsNewConvo(item.isNewConvo);
     setNewIdsSnapshot(new Set());
     setOptimisticRead(prev => new Set([...prev, String(item.id)]));
+    isFreshOpenRef.current = true;
+    if (unreadTimerRef.current) clearTimeout(unreadTimerRef.current);
     loadMessages(item.id, item.isNewConvo);
     setMobileShowChat(true);
+    setEditingMsgId(null);
+    setMenuOpenId(null);
   };
 
-  // Scroll to unread divider on open, otherwise scroll to bottom
+  const handleBack = () => {
+    setNewIdsSnapshot(new Set());
+    if (unreadTimerRef.current) clearTimeout(unreadTimerRef.current);
+    setMobileShowChat(false);
+    setEditingMsgId(null);
+    setMenuOpenId(null);
+  };
+
   useEffect(() => {
     if (unreadDivRef.current) {
       unreadDivRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -182,7 +250,6 @@ const MessagesPage = () => {
     }
   }, [location.search, loading, sidebarItems.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Poll messages ──
   useEffect(() => {
     if (pollRef.current) clearInterval(pollRef.current);
     if (!selectedId || isNewConvo) return;
@@ -206,11 +273,16 @@ const MessagesPage = () => {
     return () => clearInterval(pollRef.current);
   }, [selectedId, isNewConvo]);
 
-  // ── Poll thread list ──
   useEffect(() => {
     const listPoll = setInterval(() => { loadList(); }, 15000);
     return () => clearInterval(listPoll);
   }, [loadList]);
+
+  useEffect(() => {
+    return () => {
+      if (unreadTimerRef.current) clearTimeout(unreadTimerRef.current);
+    };
+  }, []);
 
   const sendMessage = async () => {
     const text = input.trim();
@@ -252,7 +324,54 @@ const MessagesPage = () => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
-  // ── Index of first unread message — where the divider goes ──
+  // ── Delete for Everyone ──
+  const handleDeleteForEveryone = async (msgId) => {
+    if (!window.confirm('Are you sure you want to delete this message for everyone?')) return;
+    try {
+      await messagesAPI.deleteMessage(selectedId, msgId);
+      setMessages(prev => prev.filter(m => String(m._id) !== String(msgId)));
+    } catch {}
+    setMenuOpenId(null);
+  };
+
+  // ── Delete for You only ──
+  const handleDeleteForMe = async (msgId) => {
+    if (!window.confirm('Are you sure you want to delete this message for yourself only?')) return;
+    try {
+      await messagesAPI.deleteMessageForMe(selectedId, msgId);
+      setMessages(prev => prev.filter(m => String(m._id) !== String(msgId)));
+    } catch {}
+    setMenuOpenId(null);
+  };
+
+  // ── Save edited message ──
+  const handleSaveEdit = async (msgId) => {
+    const text = editingText.trim();
+    if (!text) return;
+    try {
+      await messagesAPI.editMessage(selectedId, msgId, text);
+      setMessages(prev =>
+        prev.map(m => String(m._id) === String(msgId) ? { ...m, message: text, edited: true } : m)
+      );
+    } catch {}
+    setEditingMsgId(null);
+    setEditingText('');
+  };
+
+  // ── Delete entire conversation ──
+  const handleDeleteConversation = async () => {
+    if (!selectedId || isNewConvo) return;
+    if (!window.confirm('Delete this entire conversation? This cannot be undone.')) return;
+    try {
+      await messagesAPI.deleteThread(selectedId);
+      setSelectedId(null);
+      setSelectedName('');
+      setMessages([]);
+      setMobileShowChat(false);
+      await loadList();
+    } catch {}
+  };
+
   const firstNewIndex = messages.findIndex(
     (msg) => msg.senderName !== user?.name && newIdsSnapshot.has(String(msg._id))
   );
@@ -379,7 +498,6 @@ const MessagesPage = () => {
                           ? '1px solid rgba(239,68,68,0.4)'
                           : '1px solid rgba(0,0,0,0.08)',
                       borderRadius: 8,
-                      // Bold left accent for unread
                       borderLeft: isUnread
                         ? '3px solid #ef4444'
                         : isSelected
@@ -387,7 +505,6 @@ const MessagesPage = () => {
                           : '3px solid transparent',
                     }}
                   >
-                    {/* Unread dot */}
                     <div style={{ width: 8, flexShrink: 0 }}>
                       {isUnread && (
                         <Circle style={{ width: 8, height: 8, fill: '#ef4444', color: '#ef4444' }} />
@@ -409,7 +526,6 @@ const MessagesPage = () => {
                           {item.name}
                         </span>
                         <div className="flex items-center gap-1" style={{ flexShrink: 0 }}>
-
                           {item.lastTime && (
                             <span style={{
                               fontSize: 10,
@@ -454,26 +570,54 @@ const MessagesPage = () => {
             </div>
           ) : (
             <>
-              {/* chat header */}
+              {/* ── chat header ── */}
               <div
                 className="flex items-center gap-3"
                 style={{ padding: '12px 16px', borderBottom: '1.5px solid rgba(0,0,0,0.15)' }}
               >
                 <button
                   className="md:hidden text-gray-400 hover:text-white transition-all"
-                  onClick={() => setMobileShowChat(false)}
+                  onClick={handleBack}
                 >
                   <ChevronLeft style={{ width: 18, height: 18 }} />
                 </button>
-                <div>
+                <div className="flex-1">
                   <p className="text-white font-semibold" style={{ fontSize: 13 }}>{selectedName}</p>
                   <p className="text-gray-500" style={{ fontSize: 11 }}>
                     {isNewConvo ? 'New conversation' : isAdmin ? 'Staff' : 'Admin'}
                   </p>
                 </div>
+
+                {/* ── Delete conversation button ── */}
+                {!isNewConvo && (
+                  <button
+                    onClick={handleDeleteConversation}
+                    title="Delete conversation"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '5px 10px', borderRadius: 7,
+                      background: 'rgba(239,68,68,0.1)',
+                      border: '1px solid rgba(239,68,68,0.25)',
+                      color: '#f87171', cursor: 'pointer',
+                      fontSize: 11, fontWeight: 600,
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'rgba(239,68,68,0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(239,68,68,0.5)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'rgba(239,68,68,0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(239,68,68,0.25)';
+                    }}
+                  >
+                    <Trash2 style={{ width: 12, height: 12 }} />
+                    Delete chat
+                  </button>
+                )}
               </div>
 
-              {/* messages */}
+              {/* ── messages ── */}
               <div className="flex-1 overflow-y-auto" style={{ padding: '16px' }}>
                 {messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full gap-2">
@@ -482,14 +626,16 @@ const MessagesPage = () => {
                   </div>
                 ) : (
                   messages.map((msg, i) => {
-                    const isMine     = msg.senderName === user?.name;
-                    const isNew      = !isMine && newIdsSnapshot.has(String(msg._id));
+                    const isMine      = msg.senderName === user?.name;
+                    const isNew       = !isMine && newIdsSnapshot.has(String(msg._id));
                     const showDivider = i === firstNewIndex;
+                    const isEditing   = editingMsgId === String(msg._id);
+                    const isMenuOpen  = menuOpenId === String(msg._id);
 
                     return (
                       <React.Fragment key={msg._id || i}>
 
-                        {/* ── UNREAD DIVIDER — appears once before the first new message ── */}
+                        {/* ── UNREAD DIVIDER ── */}
                         {showDivider && (
                           <div
                             ref={unreadDivRef}
@@ -520,30 +666,208 @@ const MessagesPage = () => {
                         {/* ── MESSAGE BUBBLE ── */}
                         <div
                           className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
-                          style={{ marginBottom: 10 }}
+                          style={{ marginBottom: 10, position: 'relative' }}
+                          onMouseEnter={() => setHoveredMsgId(String(msg._id))}
+                          onMouseLeave={() => { setHoveredMsgId(null); }}
                         >
-                          <div style={{ maxWidth: '68%' }}>
-                            <div style={{
-                              padding: '8px 12px',
-                              background: isMine
-                                ? 'linear-gradient(135deg, #7c3aed, #db2777)'
-                                : isNew
-                                  ? 'rgba(239,68,68,0.10)'
-                                  : 'rgba(255,255,255,0.08)',
-                              border: isNew && !isMine
-                                ? '1px solid rgba(239,68,68,0.30)'
-                                : isMine ? 'none' : '1px solid rgba(0,0,0,0.1)',
-                              borderRadius: isMine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                            }}>
-                              <p className="text-white" style={{ fontSize: 13, lineHeight: 1.45, wordBreak: 'break-word' }}>
-                                {msg.message}
-                              </p>
-                            </div>
+                          <div style={{ maxWidth: '68%', position: 'relative' }}>
+
+                            {/* ── Hover action button (only own messages) ── */}
+                            {isMine && hoveredMsgId === String(msg._id) && !isEditing && (
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  right: 'calc(100% + 6px)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  zIndex: 10,
+                                }}
+                                onClick={e => e.stopPropagation()}
+                              >
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setMenuOpenId(isMenuOpen ? null : String(msg._id));
+                                  }}
+                                  style={{
+                                    width: 26, height: 26,
+                                    borderRadius: 6,
+                                    background: 'rgba(255,255,255,0.1)',
+                                    border: '1px solid rgba(255,255,255,0.15)',
+                                    cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    color: 'rgba(255,255,255,0.7)',
+                                  }}
+                                >
+                                  <MoreHorizontal style={{ width: 13, height: 13 }} />
+                                </button>
+
+                                {/* ── Dropdown menu ── */}
+                                {isMenuOpen && (
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      top: 30,
+                                      right: 0,
+                                      background: '#1e1535',
+                                      border: '1px solid rgba(255,255,255,0.12)',
+                                      borderRadius: 8,
+                                      overflow: 'hidden',
+                                      boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                                      zIndex: 20,
+                                      minWidth: 160,
+                                    }}
+                                    onClick={e => e.stopPropagation()}
+                                  >
+                                    {/* Edit message */}
+                                    <button
+                                      onClick={() => {
+                                        setEditingMsgId(String(msg._id));
+                                        setEditingText(msg.message);
+                                        setMenuOpenId(null);
+                                      }}
+                                      style={{
+                                        width: '100%', padding: '8px 12px',
+                                        background: 'none', border: 'none',
+                                        color: 'rgba(255,255,255,0.8)',
+                                        fontSize: 12, cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', gap: 8,
+                                        textAlign: 'left',
+                                      }}
+                                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
+                                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                                    >
+                                      <Pencil style={{ width: 11, height: 11 }} />
+                                      Edit message
+                                    </button>
+
+                                    {/* Divider */}
+                                    <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+
+                                    {/* Delete for Everyone */}
+                                    <button
+                                      onClick={() => handleDeleteForEveryone(msg._id)}
+                                      style={{
+                                        width: '100%', padding: '8px 12px',
+                                        background: 'none', border: 'none',
+                                        color: '#f87171',
+                                        fontSize: 12, cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', gap: 8,
+                                        textAlign: 'left',
+                                      }}
+                                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.1)'}
+                                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                                    >
+                                      <Trash2 style={{ width: 11, height: 11 }} />
+                                      Delete for Everyone
+                                    </button>
+
+                                    {/* Delete for You */}
+                                    <button
+                                      onClick={() => handleDeleteForMe(msg._id)}
+                                      style={{
+                                        width: '100%', padding: '8px 12px',
+                                        background: 'none', border: 'none',
+                                        color: '#fb923c',
+                                        fontSize: 12, cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', gap: 8,
+                                        textAlign: 'left',
+                                        borderTop: '1px solid rgba(255,255,255,0.06)',
+                                      }}
+                                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(251,146,60,0.1)'}
+                                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                                    >
+                                      <Trash2 style={{ width: 11, height: 11 }} />
+                                      Delete for You
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* ── Bubble or Edit input ── */}
+                            {isEditing ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <textarea
+                                  value={editingText}
+                                  onChange={e => setEditingText(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveEdit(msg._id); }
+                                    if (e.key === 'Escape') { setEditingMsgId(null); setEditingText(''); }
+                                  }}
+                                  onFocus={e => {
+                                    const len = e.target.value.length;
+                                    e.target.setSelectionRange(len, len);
+                                  }}
+                                  autoFocus
+                                  rows={2}
+                                  style={{
+                                    background: 'rgba(255,255,255,0.1)',
+                                    border: '1px solid rgba(124,58,237,0.5)',
+                                    borderRadius: 10,
+                                    padding: '8px 10px',
+                                    color: '#fff',
+                                    fontSize: 13,
+                                    resize: 'none',
+                                    outline: 'none',
+                                    width: '100%',
+                                    minWidth: 180,
+                                  }}
+                                />
+                                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                  <button
+                                    onClick={() => { setEditingMsgId(null); setEditingText(''); }}
+                                    style={{
+                                      padding: '4px 10px', borderRadius: 6,
+                                      background: 'rgba(255,255,255,0.08)',
+                                      border: '1px solid rgba(255,255,255,0.12)',
+                                      color: 'rgba(255,255,255,0.6)',
+                                      fontSize: 11, cursor: 'pointer',
+                                      display: 'flex', alignItems: 'center', gap: 4,
+                                    }}
+                                  >
+                                    <X style={{ width: 10, height: 10 }} /> Cancel
+                                  </button>
+                                  <button
+                                    onClick={() => handleSaveEdit(msg._id)}
+                                    style={{
+                                      padding: '4px 10px', borderRadius: 6,
+                                      background: 'linear-gradient(135deg, #7c3aed, #db2777)',
+                                      border: 'none',
+                                      color: '#fff',
+                                      fontSize: 11, cursor: 'pointer',
+                                      display: 'flex', alignItems: 'center', gap: 4,
+                                    }}
+                                  >
+                                    <Check style={{ width: 10, height: 10 }} /> Save
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{
+                                padding: '8px 12px',
+                                background: isMine
+                                  ? 'linear-gradient(135deg, #7c3aed, #db2777)'
+                                  : isNew
+                                    ? 'rgba(239,68,68,0.10)'
+                                    : 'rgba(255,255,255,0.08)',
+                                border: isNew && !isMine
+                                  ? '1px solid rgba(239,68,68,0.30)'
+                                  : isMine ? 'none' : '1px solid rgba(0,0,0,0.1)',
+                                borderRadius: isMine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                              }}>
+                                <p className="text-white" style={{ fontSize: 13, lineHeight: 1.45, wordBreak: 'break-word' }}>
+                                  {msg.message}
+                                </p>
+                              </div>
+                            )}
+
                             <p style={{
                               fontSize: 10, color: 'rgba(255,255,255,0.3)',
                               marginTop: 3, textAlign: isMine ? 'right' : 'left',
                             }}>
-                              {fmt(msg.createdAt)}
+                              {fmt(msg.createdAt)}{msg.edited && <span style={{ marginLeft: 4, opacity: 0.6 }}>(edited)</span>}
                             </p>
                           </div>
                         </div>
@@ -555,7 +879,7 @@ const MessagesPage = () => {
                 <div ref={bottomRef} />
               </div>
 
-              {/* input */}
+              {/* ── input ── */}
               <div
                 className="flex items-end gap-2"
                 style={{ padding: '10px 14px', borderTop: '1.5px solid rgba(0,0,0,0.15)' }}

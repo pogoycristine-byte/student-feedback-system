@@ -156,7 +156,7 @@ const Login = () => {
   const handleForgotResetPassword = async () => {
     if (!newPassword || !confirmPassword) { setForgotError('Please fill in all fields.'); return; }
     if (newPassword !== confirmPassword) { setForgotError('Passwords do not match.'); return; }
-    if (newPassword.length < 6) { setForgotError('Password must be at least 6 characters.'); return; }
+    if (newPassword.length < 8) { setForgotError('Password must be at least 6 characters.'); return; }
     setForgotError('');
     setForgotLoading(true);
     try {
