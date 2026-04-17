@@ -87,7 +87,7 @@ const announcementRoutes  = require('./routes/announcements');
 const messageRoutes       = require('./routes/messages');
 const notificationRoutes  = require('./routes/notifications');
 
-app.use('/api/auth',          authLimiter, authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/feedback',      feedbackRoutes);
 app.use('/api/categories',    categoryRoutes);
 app.use('/api/users',         userRoutes);
