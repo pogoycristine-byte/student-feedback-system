@@ -86,7 +86,7 @@ const analyticsRoutes     = require('./routes/analytics');
 const announcementRoutes  = require('./routes/announcements');
 const messageRoutes       = require('./routes/messages');
 const notificationRoutes  = require('./routes/notifications');
-
+const supportRoutes       = require('./routes/support');
 app.use('/api/auth', authRoutes);
 app.use('/api/feedback',      feedbackRoutes);
 app.use('/api/categories',    categoryRoutes);
@@ -95,7 +95,7 @@ app.use('/api/analytics',     analyticsRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/messages',      messageRoutes);
 app.use('/api/notifications', notificationRoutes);
-
+app.use('/api/support',       supportRoutes);
 // ── 404 Handler ──
 app.use((req, res) => {
   res.status(404).json({ 

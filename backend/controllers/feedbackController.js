@@ -82,14 +82,15 @@ exports.submitFeedback = async (req, res) => {
     await feedback.populate('student', 'name studentId email yearLevel section');
     await feedback.populate('category', 'name');
 
-    await createNotification({
-      type: 'new_feedback',
-      title: '📋 New Feedback Submitted',
-      message: `${isAnonymous ? 'Anonymous student' : feedback.student?.name} submitted: "${subject}"`,
-      feedbackId: feedback._id,
-      studentName: isAnonymous ? 'Anonymous' : feedback.student?.name || '',
-      targetRoles: ['admin', 'staff'],
-    });
+   await createNotification({
+  type: 'status_changed',
+  title: '🔄 Feedback Status Updated',
+  message: `"${feedback.subject}" changed from ${oldStatus} → ${status}`,
+  feedbackId: feedback._id,
+  studentName: feedback.student?.name || '',
+  targetRoles: ['admin', 'staff'],
+  excludeUserId: req.user.id,
+});
 
     res.status(201).json({
       success: true,
