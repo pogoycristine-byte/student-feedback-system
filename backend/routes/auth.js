@@ -33,7 +33,7 @@ router.post('/register', strictLimiter, uploadProfile.single('profilePicture'), 
 
 // @route   POST /api/auth/login
 // ✅ ADDED: strictLimiter (you already have authLimiter in server.js, this adds per-route protection too)
-router.post('/login', strictLimiter, authController.login);
+router.post('/login', authController.login);
 
 // @route   GET /api/auth/me
 router.get('/me', protect, authController.getProfile);

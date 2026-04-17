@@ -146,19 +146,19 @@ exports.login = async (req, res) => {
       });
     }
 
-    if (isAccountLocked(email.toLowerCase())) {
-      const attempts = loginAttempts.get(email.toLowerCase());
-      const minutesLeft = Math.ceil((attempts.lockedUntil - Date.now()) / 60000);
-      return res.status(429).json({
-        success: false,
-        message: `Too many failed attempts. Try again in ${minutesLeft} minute(s).`
-      });
-    }
+   // if (isAccountLocked(email.toLowerCase())) {
+     // const attempts = loginAttempts.get(email.toLowerCase());
+      //const minutesLeft = Math.ceil((attempts.lockedUntil - Date.now()) / 60000);
+      //return res.status(429).json({
+       // success: false,
+       // message: `Too many failed attempts. Try again in ${minutesLeft} minute(s).`
+     // });
+   // }
 
     const user = await User.findOne({ email }).select('+password');
 
     if (!user) {
-      recordFailedAttempt(email.toLowerCase());
+     // recordFailedAttempt(email.toLowerCase());
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
@@ -174,19 +174,15 @@ exports.login = async (req, res) => {
 
     const isPasswordCorrect = await user.comparePassword(password);
 
-    if (!isPasswordCorrect) {
-      recordFailedAttempt(email.toLowerCase());
-      const attempts = loginAttempts.get(email.toLowerCase());
-      const remaining = MAX_LOGIN_ATTEMPTS - (attempts?.count || 0);
-      return res.status(401).json({
-        success: false,
-        message: remaining > 0
-          ? `Invalid email or password. ${remaining} attempt(s) remaining.`
-          : 'Account locked for 15 minutes due to too many failed attempts.'
-      });
-    }
+  if (!isPasswordCorrect) {
+  // recordFailedAttempt(email.toLowerCase());
+  return res.status(401).json({
+    success: false,
+    message: 'Invalid email or password'
+  });
+}
 
-    clearLoginAttempts(email.toLowerCase());
+   // clearLoginAttempts(email.toLowerCase());
 
     user.lastLogin = new Date();
     await user.save();
