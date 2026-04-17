@@ -17,4 +17,7 @@ router.put('/:id/toggle-status', protect, requireAdmin, userController.toggleUse
 // ✅ CHANGED: was requireAdminOrStaff, now requireAdmin only — staff should not delete users
 router.delete('/:id', protect, requireAdmin, userController.deleteUser);
 
+// @route   POST /api/users/save-fcm-token - Save FCM token
+router.post('/save-fcm-token', protect, userController.saveFcmToken);
+
 module.exports = router;

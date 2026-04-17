@@ -46,7 +46,43 @@ exports.getMessages = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+exports.getMyThreads = async (req, res) => {
+  try {
+    const userId = req.user._id;
 
+    const threads = await SupportThread.find({ participants: userId })
+      .populate('participants', 'name email role')
+      .sort({ updatedAt: -1 });
+
+    const shaped = threads.map((t) => {
+      const lastMsg = t.messages.length ? t.messages[t.messages.length - 1] : null;
+      const myRead = t.lastReadBy?.find(r => r.userId.toString() === userId.toString());
+
+      let isUnread = false;
+      if (lastMsg) {
+        const sentByMe = lastMsg.sender.toString() === userId.toString();
+        if (!sentByMe) {
+          isUnread = !myRead || myRead.messageId.toString() !== lastMsg._id.toString();
+        }
+      }
+
+      return {
+        _id:          t._id,
+        subject:      t.subject,
+        status:       t.status,
+        participants: t.participants,
+        lastMessage:  lastMsg ? { message: lastMsg.message, createdAt: lastMsg.createdAt } : null,
+        isUnread,
+        updatedAt:    t.updatedAt,
+      };
+    });
+
+    res.json({ threads: shaped });
+  } catch (err) {
+    console.error('getMyThreads:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 // ✅ UPDATE sendMessage  
 exports.sendMessage = async (req, res) => {
   try {

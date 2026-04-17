@@ -3,9 +3,10 @@ const ctrl   = require('../controllers/supportController');
 const { protect, requireAdmin } = require('../middleware/auth');
 
 // ── Student routes (any authenticated user) ───────────────────────────────
+router.get('/threads/my',                      protect, ctrl.getMyThreads);        // ← MUST be first
 router.post('/threads/:id/messages',           protect, ctrl.sendMessage);
-router.get('/threads/:id/messages',            protect, ctrl.getMessages);   // ← was admin-only
-router.patch('/threads/:id/read',              protect, ctrl.markAsRead);    // ← was admin-only
+router.get('/threads/:id/messages',            protect, ctrl.getMessages);
+router.patch('/threads/:id/read',              protect, ctrl.markAsRead);
 
 // ── Admin-only routes ─────────────────────────────────────────────────────
 router.get('/students',                        protect, requireAdmin, ctrl.getStudents);

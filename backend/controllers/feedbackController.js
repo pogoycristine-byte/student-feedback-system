@@ -1,5 +1,7 @@
 const Feedback = require('../models/Feedback');
 const { createNotification } = require('../utils/notificationHelper');
+const sendPushNotification = require('../sendPushNotification'); // ← ADDED
+const User = require('../models/User');                          // ← ADDED
 
 // ── Input sanitizer helper ──
 const sanitizeString = (str) => {
@@ -82,15 +84,15 @@ exports.submitFeedback = async (req, res) => {
     await feedback.populate('student', 'name studentId email yearLevel section');
     await feedback.populate('category', 'name');
 
-   await createNotification({
-  type: 'status_changed',
-  title: '🔄 Feedback Status Updated',
-  message: `"${feedback.subject}" changed from ${oldStatus} → ${status}`,
-  feedbackId: feedback._id,
-  studentName: feedback.student?.name || '',
-  targetRoles: ['admin', 'staff'],
-  excludeUserId: req.user.id,
-});
+    await createNotification({
+      type: 'new_feedback',
+      title: '📝 New Feedback Submitted',
+      message: `"${feedback.subject}" was submitted`,
+      feedbackId: feedback._id,
+      studentName: feedback.student?.name || '',
+      targetRoles: ['admin', 'staff'],
+      excludeUserId: req.user.id,
+    });
 
     res.status(201).json({
       success: true,
@@ -265,7 +267,7 @@ exports.getAllFeedback = async (req, res) => {
       .populate('category', 'name icon')
       .populate('adminResponse.respondedBy', 'name role')
       .populate('lastUpdatedBy', 'name role')
-      .populate('statusHistory.changedBy', 'name role') // ✅ ADDED: populate changedBy so activity log shows real names
+      .populate('statusHistory.changedBy', 'name role')
       .sort({ createdAt: -1 });
 
     const processedFeedback = feedback.map(item => {
@@ -362,6 +364,16 @@ exports.updateFeedbackStatus = async (req, res) => {
         studentName: feedback.student?.name || '',
         targetRoles: ['admin', 'staff'],
       });
+
+      // ✅ Send push notification to student
+      const student = await User.findById(feedback.student._id).select('fcmToken');
+      if (student?.fcmToken) {
+        await sendPushNotification(
+          student.fcmToken,
+          'Feedback Status Updated',
+          `Your feedback "${feedback.subject}" is now ${status}`
+        );
+      }
     }
 
     await feedback.populate('student', 'name studentId email');
@@ -498,6 +510,16 @@ exports.sendMessage = async (req, res) => {
         studentName: feedback.student?.name || '',
         targetRoles: ['admin', 'staff'],
       });
+    } else {
+      // ✅ Send push notification to student when admin/staff replies
+      const student = await User.findById(feedback.student._id).select('fcmToken');
+      if (student?.fcmToken) {
+        await sendPushNotification(
+          student.fcmToken,
+          'New Message from Admin',
+          `You have a new reply on "${feedback.subject}"`
+        );
+      }
     }
 
     await feedback.populate('messages.sender', 'name role');
