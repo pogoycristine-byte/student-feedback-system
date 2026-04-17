@@ -1,6 +1,6 @@
 const SupportThread = require('../models/SupportThread');
 const User          = require('../models/User');
-
+const mongoose = require('mongoose');  
 const sanitize = (str) => {
   if (!str) return str;
   return str
@@ -8,7 +8,134 @@ const sanitize = (str) => {
     .replace(/>/g,  '&gt;')
     .replace(/"/g,  '&quot;')
     .replace(/'/g,  '&#x27;');
+};// ✅ ADD THIS
+// ✅ ADD THIS HELPER at top of file (after imports)
+const isValidObjectId = (str) => {
+  return mongoose.Types.ObjectId.isValid(str);
 };
+
+// ✅ UPDATE getMessages
+exports.getMessages = async (req, res) => {
+  try {
+    const { id } = req.params;  // ← This can be empty!
+    
+    // ✅ VALIDATE ID FIRST
+    if (!id || !isValidObjectId(id)) {
+      return res.status(400).json({ message: 'Invalid thread ID' });
+    }
+
+    const userId = req.user._id;
+    const thread = await SupportThread.findById(id)
+      .populate('participants', 'name email role');
+
+    if (!thread) return res.status(404).json({ message: 'Thread not found' });
+
+    // ✅ Check participant access
+    const isParticipant = thread.participants.some(p => p._id.toString() === userId.toString());
+    if (!isParticipant) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const messages = thread.messages.filter(
+      (m) => !m.hiddenFrom?.some((hid) => hid.toString() === userId.toString())
+    );
+
+    res.json({ messages, participants: thread.participants, lastReadBy: thread.lastReadBy });
+  } catch (err) {
+    console.error('getMessages:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ✅ UPDATE sendMessage  
+exports.sendMessage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { message, subject } = req.body;
+    const senderId = req.user._id;
+
+    // ✅ VALIDATE USER ID
+    if (!senderId || !isValidObjectId(senderId.toString())) {
+      return res.status(401).json({ message: 'Invalid user' });
+    }
+
+    if (!message?.trim()) {
+      return res.status(400).json({ message: 'Message cannot be empty' });
+    }
+
+    let thread;
+
+    // ✅ If valid ObjectId, check existing thread
+    if (isValidObjectId(id)) {
+      thread = await SupportThread.findById(id);
+    }
+
+    // ✅ Create new thread if no existing or invalid ID
+    if (!thread) {
+      const student = await User.findById(id);
+      if (!student) {
+        return res.status(404).json({ message: 'Student not found' });
+      }
+
+      thread = new SupportThread({
+        subject: sanitize(subject?.trim()) || 'Support Request',
+        participants: [student._id, senderId],
+        messages: [],
+        lastReadBy: [],
+      });
+    }
+
+    // Rest unchanged...
+    thread.messages.push({
+      sender: senderId,
+      senderName: req.user.name,
+      senderRole: req.user.role,
+      message: sanitize(message.trim()),
+    });
+    thread.updatedAt = new Date();
+
+    const newMsg = thread.messages[thread.messages.length - 1];
+    const myRead = thread.lastReadBy?.find(r => r.userId.toString() === senderId.toString());
+    if (myRead) {
+      myRead.messageId = newMsg._id;
+    } else {
+      thread.lastReadBy.push({ userId: senderId, messageId: newMsg._id });
+    }
+
+    await thread.save();
+    res.status(201).json({ 
+      message: newMsg, 
+      threadId: thread._id.toString()  // ✅ Force string
+    });
+  } catch (err) {
+    console.error('sendMessage:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ✅ UPDATE markAsRead
+exports.markAsRead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // ✅ VALIDATE ID
+    if (!id || !isValidObjectId(id)) {
+      return res.status(400).json({ message: 'Invalid thread ID' });
+    }
+
+    const userId = req.user._id;
+    const thread = await SupportThread.findById(id);
+    
+    if (!thread) return res.status(404).json({ message: 'Thread not found' });
+    if (!thread.messages.length) return res.json({ success: true });
+
+    // Rest unchanged...
+  } catch (err) {
+    console.error('markAsRead:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 
 // GET /api/support/students
 // Returns all students (for sidebar list)
