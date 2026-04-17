@@ -93,7 +93,7 @@ exports.getMessages = async (req, res) => {
       (m) => !m.hiddenFrom?.some((id) => id.toString() === userId.toString())
     );
 
-    res.json({ messages, participants: thread.participants });
+    res.json({ messages, participants: thread.participants, lastReadBy: thread.lastReadBy });
   } catch (err) {
     console.error('getMessages:', err);
     res.status(500).json({ message: 'Server error' });
