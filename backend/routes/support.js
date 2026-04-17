@@ -2,10 +2,13 @@ const router = require('express').Router();
 const ctrl   = require('../controllers/supportController');
 const { protect, requireAdmin } = require('../middleware/auth');
 
+// Student route
+router.post('/threads/:id/messages',           protect,              ctrl.sendMessage);
+
+// Admin routes
 router.get('/students',                        protect, requireAdmin, ctrl.getStudents);
 router.get('/threads',                         protect, requireAdmin, ctrl.getThreads);
 router.get('/threads/:id/messages',            protect, requireAdmin, ctrl.getMessages);
-router.post('/threads/:id/messages',           protect, requireAdmin, ctrl.sendMessage);
 router.patch('/threads/:id/read',              protect, requireAdmin, ctrl.markAsRead);
 router.patch('/threads/:id/status',            protect, requireAdmin, ctrl.updateStatus);
 router.patch('/threads/:id/messages/:mId',     protect, requireAdmin, ctrl.editMessage);
