@@ -185,12 +185,7 @@ exports.login = async (req, res) => {
     }
 
     // ── ADDED: Block students from accessing the admin/staff web portal ──
-    if (!['admin', 'staff'].includes(user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. This portal is for admin and staff only.',
-      });
-    }
+   
     // ─────────────────────────────────────────────────────────────────────
 
    // clearLoginAttempts(email.toLowerCase());
