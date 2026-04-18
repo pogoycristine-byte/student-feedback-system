@@ -516,7 +516,7 @@ exports.sendMessage = async (req, res) => {
       if (student?.fcmToken) {
         await sendPushNotification(
           student.fcmToken,
-          'New Message from Admin',
+          'New Message',
           `You have a new reply on "${feedback.subject}"`
         );
       }
