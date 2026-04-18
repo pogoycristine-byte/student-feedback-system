@@ -6,6 +6,8 @@ const sendPushNotification = async (fcmToken, title, body) => {
     await admin.messaging().send({
       token: fcmToken,
       notification: { title, body },
+      data: { title, body },
+      android: { priority: 'high' },
     });
     console.log('✅ Push notification sent');
   } catch (error) {
