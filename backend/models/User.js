@@ -56,6 +56,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  deactivationRemark: {
+    type: String,
+    default: ''
+  },
   lastLogin: {
     type: Date
   },

@@ -38,6 +38,9 @@ router.post('/login', authController.login);
 // @route   GET /api/auth/me
 router.get('/me', protect, authController.getProfile);
 
+// ✅ ADDED: used by mobile app to poll account status (detects deactivation)
+router.get('/status', protect, authController.getMe);
+
 // @route   PUT /api/auth/update-profile
 router.put('/update-profile', protect, uploadProfile.single('profilePicture'), authController.updateProfile);
 

@@ -165,10 +165,12 @@ exports.login = async (req, res) => {
       });
     }
 
+    // ✅ CHANGED: 403 + deactivated flag so mobile can detect and show specific alert
     if (!user.isActive) {
-      return res.status(401).json({
+      return res.status(403).json({
         success: false,
-        message: 'Your account has been deactivated. Please contact admin.'
+        message: 'Your account has been deactivated. Please contact admin.',
+        deactivated: true,
       });
     }
 

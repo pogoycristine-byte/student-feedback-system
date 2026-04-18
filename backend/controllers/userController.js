@@ -127,6 +127,17 @@ exports.toggleUserStatus = async (req, res) => {
     }
 
     user.isActive = !user.isActive;
+
+    // ✅ ADDED: save remark when deactivating
+    if (!user.isActive && req.body.remarks) {
+      user.deactivationRemark = req.body.remarks;
+    }
+
+    // ✅ ADDED: clear remark when re-activating
+    if (user.isActive) {
+      user.deactivationRemark = '';
+    }
+
     await user.save();
 
     res.status(200).json({
@@ -195,6 +206,7 @@ exports.deleteUser = async (req, res) => {
     });
   }
 };
+
 // @desc    Save FCM Token for push notifications
 exports.saveFcmToken = async (req, res) => {
   try {
@@ -211,6 +223,33 @@ exports.saveFcmToken = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error saving FCM token',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
+// @desc    Get current logged-in user (used by mobile to poll account status)
+exports.getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account has been deactivated. Please contact your administrator.',
+        deactivated: true,
+      });
+    }
+
+    res.status(200).json({ success: true, user });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
