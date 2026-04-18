@@ -134,7 +134,7 @@ exports.register = async (req, res) => {
   }
 };
 
-// @desc    Login user (students, staff, and admin)
+// @desc    Login user (admin and staff only for web portal)
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -176,13 +176,22 @@ exports.login = async (req, res) => {
 
     const isPasswordCorrect = await user.comparePassword(password);
 
-  if (!isPasswordCorrect) {
-  // recordFailedAttempt(email.toLowerCase());
-  return res.status(401).json({
-    success: false,
-    message: 'Invalid email or password'
-  });
-}
+    if (!isPasswordCorrect) {
+      // recordFailedAttempt(email.toLowerCase());
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    // ── ADDED: Block students from accessing the admin/staff web portal ──
+    if (!['admin', 'staff'].includes(user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. This portal is for admin and staff only.',
+      });
+    }
+    // ─────────────────────────────────────────────────────────────────────
 
    // clearLoginAttempts(email.toLowerCase());
 
