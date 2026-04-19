@@ -31,7 +31,6 @@ const CARTOON_AVATARS = [
   { id: 'luna',  uri: 'https://api.dicebear.com/7.x/avataaars/png?seed=luna&backgroundColor=ffeaa7' },
 ];
 
-// ✅ NEW: Generate a DiceBear avatar URL from the user's name as fallback
 const generateAutoAvatar = (name) => {
   const seed = encodeURIComponent(name.trim().toLowerCase().replace(/\s+/g, '-') || 'student');
   const colors = ['b6e3f4', 'ffdfbf', 'c0aede', 'd1f4d1', 'ffd5dc', 'ffeaa7', 'e8d5ff', 'ffd6a5'];
@@ -53,6 +52,9 @@ const Field = React.memo(({
       keyboardType={keyboardType || 'default'}
       secureTextEntry={secureTextEntry || false}
       autoCapitalize={autoCapitalize || 'sentences'}
+      autoCorrect={false}
+      spellCheck={false}
+      textContentType={field === 'email' ? 'emailAddress' : 'none'}  // ← ADD THIS
     />
     {errors[field] && <Text style={styles.errorText}>⚠ {errors[field]}</Text>}
   </View>
@@ -82,15 +84,37 @@ const RegisterScreen = ({ navigation }) => {
   const { setUser } = useAuth();
   const scrollRef   = useRef(null);
 
+  // ── UPDATED: only allow letters and spaces in name ──
+  const handleNameChange = (text) => {
+    const lettersOnly = text.replace(/[^a-zA-Z\s]/g, '');
+    handleChange('name', lettersOnly);
+  };
+
+  // ── UPDATED: student ID limited to exactly 8 chars format XX-XXXXX ──
   const handleStudentIdChange = (text) => {
-    const digits = text.replace(/\D/g, '').slice(0, 9);
+    const digits = text.replace(/\D/g, '').slice(0, 7); // 7 digits = XX-XXXXX
     const formatted = digits.length > 2 ? digits.slice(0, 2) + '-' + digits.slice(2) : digits;
     setFormData(prev => ({ ...prev, studentId: formatted }));
     if (errors.studentId) setErrors(prev => ({ ...prev, studentId: null }));
   };
 
+  // ── UPDATED: phone number — user types last 9 digits, +639 is prefixed ──
+  const handlePhoneChange = (text) => {
+    const digits = text.replace(/\D/g, '').slice(0, 9);
+    setFormData(prev => ({ ...prev, phoneNumber: digits }));
+    if (errors.phoneNumber) setErrors(prev => ({ ...prev, phoneNumber: null }));
+  };
+
+  // ── UPDATED: section/block — only numbers 1-100 ──
+  const handleSectionChange = (text) => {
+    const digits = text.replace(/\D/g, '');
+    const num = parseInt(digits, 10);
+    if (digits === '' || (num >= 1 && num <= 100)) {
+      handleChange('section', digits);
+    }
+  };
+
   const validateEmail    = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-  const validatePhone    = (p) => /^\d{11}$/.test(p);
 
   const validatePassword = (password) => ({
     hasUpper:   /[A-Z]/.test(password),
@@ -107,19 +131,59 @@ const RegisterScreen = ({ navigation }) => {
 
   const validate = () => {
     const newErrors = {};
-    if (!formData.name.trim())        newErrors.name = 'Full name is required';
-    if (!formData.studentId.trim())   newErrors.studentId = 'Student ID is required';
-    if (!formData.email.trim())       newErrors.email = 'Email is required';
-    else if (!validateEmail(formData.email)) newErrors.email = 'Enter a valid email address';
-    if (!formData.phoneNumber.trim()) newErrors.phoneNumber = 'Phone number is required';
-    else if (!validatePhone(formData.phoneNumber)) newErrors.phoneNumber = 'Phone number must be exactly 11 digits';
-    if (!formData.section.trim())     newErrors.section = 'Block is required';
-    if (!formData.password)           newErrors.password = 'Password is required';
-    else if (!isPasswordStrong(formData.password))
+
+    // ── Name: letters only ──
+    if (!formData.name.trim()) {
+      newErrors.name = 'Full name is required';
+    } else if (/[^a-zA-Z\s]/.test(formData.name)) {
+      newErrors.name = 'Name must contain letters only';
+    }
+
+    // ── Student ID: must be exactly XX-XXXXX (8 chars) ──
+    if (!formData.studentId.trim()) {
+      newErrors.studentId = 'Student ID is required';
+    } else if (!/^\d{2}-\d{5}$/.test(formData.studentId)) {
+      newErrors.studentId = 'Student ID must be in format XX-XXXXX (e.g. 23-01234)';
+    }
+
+    // ── Email ──
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!validateEmail(formData.email)) {
+      newErrors.email = 'Enter a valid email address';
+    }
+
+    // ── Phone: must be exactly 9 digits (we prepend +639) ──
+    if (!formData.phoneNumber.trim()) {
+      newErrors.phoneNumber = 'Phone number is required';
+    } else if (formData.phoneNumber.length !== 9) {
+      newErrors.phoneNumber = 'Enter the last 9 digits of your PH number';
+    }
+
+    // ── Section/Block: number 1-100 ──
+    if (!formData.section.trim()) {
+      newErrors.section = 'Block is required';
+    } else {
+      const blockNum = parseInt(formData.section, 10);
+      if (isNaN(blockNum) || blockNum < 1 || blockNum > 100) {
+        newErrors.section = 'Block must be a number between 1 and 100';
+      }
+    }
+
+    // ── Password ──
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (!isPasswordStrong(formData.password)) {
       newErrors.password = 'Password must be at least 8 characters with uppercase, lowercase, number, and special character';
-    if (!formData.confirmPassword)    newErrors.confirmPassword = 'Please confirm your password';
-    else if (formData.password !== formData.confirmPassword)
+    }
+
+    // ── Confirm Password ──
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -175,6 +239,9 @@ const RegisterScreen = ({ navigation }) => {
     try {
       const isLocalPhoto = avatarChoice?.uri && !avatarChoice.uri.startsWith('http');
 
+      // ── Build full PH phone number for submission ──
+      const fullPhoneNumber = `+639${formData.phoneNumber}`;
+
       let response;
 
       if (isLocalPhoto) {
@@ -182,7 +249,7 @@ const RegisterScreen = ({ navigation }) => {
         form.append('name',        formData.name);
         form.append('studentId',   formData.studentId);
         form.append('email',       formData.email);
-        form.append('phoneNumber', formData.phoneNumber);
+        form.append('phoneNumber', fullPhoneNumber);
         form.append('yearLevel',   formData.yearLevel);
         form.append('section',     formData.section);
         form.append('password',    formData.password);
@@ -201,7 +268,7 @@ const RegisterScreen = ({ navigation }) => {
           name:           formData.name,
           studentId:      formData.studentId,
           email:          formData.email,
-          phoneNumber:    formData.phoneNumber,
+          phoneNumber:    fullPhoneNumber,
           yearLevel:      formData.yearLevel,
           section:        formData.section,
           password:       formData.password,
@@ -240,7 +307,6 @@ const RegisterScreen = ({ navigation }) => {
     }
   };
 
-  // ✅ NEW: Skip now uses the user's name to generate an auto avatar instead of null
   const handleSkip = () => {
     const autoAvatarUri = generateAutoAvatar(formData.name);
     handleRegister({ uri: autoAvatarUri });
@@ -269,34 +335,63 @@ const RegisterScreen = ({ navigation }) => {
             </View>
 
             <View style={styles.formContainer}>
-              <Field field="name" placeholder="Full Name" formData={formData} errors={errors} handleChange={handleChange} />
 
+              {/* ── UPDATED: Name — letters only ── */}
+              <View style={styles.fieldWrap}>
+                <TextInput
+                  style={[styles.input, errors.name && styles.inputError]}
+                  placeholder="Full Name (letters only)"
+                  placeholderTextColor="#999"
+                  value={formData.name}
+                  onChangeText={handleNameChange}
+                  autoCapitalize="words"
+                />
+                {errors.name && <Text style={styles.errorText}>⚠ {errors.name}</Text>}
+              </View>
+
+              {/* ── UPDATED: Student ID — XX-XXXXX format (8 chars) ── */}
               <View style={styles.fieldWrap}>
                 <TextInput
                   style={[styles.input, errors.studentId && styles.inputError]}
-                  placeholder="Student ID (e.g. 23-12345)"
+                  placeholder="Student ID (e.g. 23-01234)"
                   placeholderTextColor="#999"
                   value={formData.studentId}
                   onChangeText={handleStudentIdChange}
                   keyboardType="numeric"
                   autoCapitalize="none"
-                  maxLength={11}
+                  maxLength={8}
                 />
                 {errors.studentId && <Text style={styles.errorText}>⚠ {errors.studentId}</Text>}
               </View>
 
-              <Field field="email" placeholder="Email" keyboardType="email-address" autoCapitalize="none" formData={formData} errors={errors} handleChange={handleChange} />
+           <Field
+  field="email"
+  placeholder="Email"
+  keyboardType="email-address"
+  autoCapitalize="none"
+  formData={formData}
+  errors={errors}
+  handleChange={(field, value) =>
+    handleChange(field, field === 'email' ? value.toLowerCase() : value)
+  }
+/>
 
+              {/* ── UPDATED: Phone — +639 prefix embedded ── */}
               <View style={styles.fieldWrap}>
-                <TextInput
-                  style={[styles.input, errors.phoneNumber && styles.inputError]}
-                  placeholder="Phone Number (11 digits)"
-                  placeholderTextColor="#999"
-                  value={formData.phoneNumber}
-                  onChangeText={(text) => handleChange('phoneNumber', text.replace(/\D/g, '').slice(0, 11))}
-                  keyboardType="phone-pad"
-                  maxLength={11}
-                />
+                <View style={[styles.phoneWrap, errors.phoneNumber && styles.inputError]}>
+                  <View style={styles.phonePrefix}>
+                    <Text style={styles.phonePrefixText}>+639</Text>
+                  </View>
+                  <TextInput
+                    style={styles.phoneInput}
+                    placeholder="XXXXXXXXX"
+                    placeholderTextColor="#999"
+                    value={formData.phoneNumber}
+                    onChangeText={handlePhoneChange}
+                    keyboardType="phone-pad"
+                    maxLength={9}
+                  />
+                </View>
                 {errors.phoneNumber && <Text style={styles.errorText}>⚠ {errors.phoneNumber}</Text>}
               </View>
 
@@ -314,7 +409,19 @@ const RegisterScreen = ({ navigation }) => {
                 </Picker>
               </View>
 
-              <Field field="section" placeholder="Block" formData={formData} errors={errors} handleChange={handleChange} />
+              {/* ── UPDATED: Block — numbers 1-100 only ── */}
+              <View style={styles.fieldWrap}>
+                <TextInput
+                  style={[styles.input, errors.section && styles.inputError]}
+                  placeholder="Block (1-100)"
+                  placeholderTextColor="#999"
+                  value={formData.section}
+                  onChangeText={handleSectionChange}
+                  keyboardType="numeric"
+                  maxLength={3}
+                />
+                {errors.section && <Text style={styles.errorText}>⚠ {errors.section}</Text>}
+              </View>
 
               {/* PASSWORD */}
               <View style={styles.fieldWrap}>
@@ -416,7 +523,6 @@ const RegisterScreen = ({ navigation }) => {
           <Text style={styles.title}>Profile Picture</Text>
         </View>
 
-        {/* ✅ NEW: Show auto avatar preview when nothing is selected */}
         <View style={styles.avatarPreviewWrap}>
           {previewUri ? (
             <Image source={{ uri: previewUri }} style={styles.avatarPreview} />
@@ -441,7 +547,6 @@ const RegisterScreen = ({ navigation }) => {
           )}
         </View>
 
-        {/* ✅ NEW: Hint text when on auto avatar */}
         {!previewUri && (
           <Text style={styles.autoAvatarHint}>
             ✨ An avatar was generated from your name. You can change it or keep it!
@@ -509,7 +614,6 @@ const RegisterScreen = ({ navigation }) => {
             </LinearGradient>
           </TouchableOpacity>
 
-          {/* ✅ UPDATED: Skip now says "Use Auto Avatar" and shows what will be used */}
           <TouchableOpacity
             style={styles.skipBtn}
             onPress={handleSkip}
@@ -570,6 +674,36 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginLeft: 4,
   },
+
+  // ── ADDED: Phone prefix styles ──
+  phoneWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    overflow: 'hidden',
+  },
+  phonePrefix: {
+    backgroundColor: 'rgba(139,92,246,0.3)',
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255,255,255,0.2)',
+  },
+  phonePrefixText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  phoneInput: {
+    flex: 1,
+    padding: 16,
+    color: '#fff',
+    fontSize: 16,
+  },
+
   pickerContainer: {
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 12,
@@ -641,7 +775,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // ✅ NEW styles for auto avatar
   autoAvatarWrap: {
     position: 'relative',
   },

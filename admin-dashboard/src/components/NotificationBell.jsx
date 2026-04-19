@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell, X, Trash2, CheckCheck, ExternalLink } from 'lucide-react';
-import { notificationsAPI } from '../services/api';
+import { notificationsAPI, userAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const TYPE_CONFIG = {
   new_feedback:     { icon: '📋', bg: 'rgba(124,58,237,0.15)',  border: 'rgba(124,58,237,0.3)'  },
   student_reply:    { icon: '💬', bg: 'rgba(59,130,246,0.15)',  border: 'rgba(59,130,246,0.3)'  },
   overdue_feedback: { icon: '⚠️', bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.3)'  },
   status_changed:   { icon: '🔄', bg: 'rgba(16,185,129,0.15)', border: 'rgba(16,185,129,0.3)'  },
-  dm_message:       { icon: '✉️', bg: 'rgba(236,72,153,0.15)', border: 'rgba(236,72,153,0.3)'  },
+  // ── NEW: new user registered ──
+  new_user:         { icon: '👤', bg: 'rgba(239,68,68,0.15)',   border: 'rgba(239,68,68,0.3)'   },
 };
 
 const timeAgo = (date) => {
@@ -19,27 +21,106 @@ const timeAgo = (date) => {
   return `${Math.floor(diff / 86400)}d ago`;
 };
 
-const NotificationBell = ({ isLightMode }) => {
+// ── Same localStorage key used by Students.jsx & Sidebar.jsx ──
+const VIEWED_NEW_USERS_KEY = 'viewedNewUserIds';
+const getViewedNewUserIds = () => {
+  try { return new Set(JSON.parse(localStorage.getItem(VIEWED_NEW_USERS_KEY) || '[]')); }
+  catch { return new Set(); }
+};
+const markUserAsViewed = (id) => {
+  try {
+    const viewed = getViewedNewUserIds();
+    viewed.add(id);
+    localStorage.setItem(VIEWED_NEW_USERS_KEY, JSON.stringify([...viewed]));
+    window.dispatchEvent(new Event('newUserViewed'));
+  } catch {}
+};
+const markAllUsersAsViewed = (ids) => {
+  try {
+    const viewed = getViewedNewUserIds();
+    ids.forEach(id => viewed.add(id));
+    localStorage.setItem(VIEWED_NEW_USERS_KEY, JSON.stringify([...viewed]));
+    window.dispatchEvent(new Event('newUserViewed'));
+  } catch {}
+};
+
+const NotificationBell = ({ isLightMode, feedbackCount = 0 }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+
+  // ── NEW: synthetic new-user notifications ──
+  const [newUserNotifs, setNewUserNotifs] = useState([]);
+
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // ── Fetch new-user notifications (users registered in last 24h, not yet viewed) ──
+  const fetchNewUserNotifs = useCallback(async () => {
+    // Only admins see new-user notifications
+    if (user?.role !== 'admin') return;
+    try {
+      const [studentsRes, staffRes, adminRes] = await Promise.all([
+        userAPI.getAll({ role: 'student' }),
+        userAPI.getAll({ role: 'staff' }),
+        userAPI.getAll({ role: 'admin' }),
+      ]);
+      const all = [
+        ...(studentsRes.data.users || []).map(u => ({ ...u, role: 'student' })),
+        ...(staffRes.data.users   || []).map(u => ({ ...u, role: 'staff'   })),
+        ...(adminRes.data.users   || []).map(u => ({ ...u, role: 'admin'   })),
+      ];
+      const viewed = getViewedNewUserIds();
+      const now = new Date();
+      const unviewed = all.filter(u => {
+        if (!u.createdAt) return false;
+        const hoursDiff = (now - new Date(u.createdAt)) / (1000 * 60 * 60);
+        return hoursDiff <= 24 && !viewed.has(u._id);
+      });
+
+      // Shape them like notification objects so the list renders uniformly
+      setNewUserNotifs(unviewed.map(u => ({
+        _id:        `new_user_${u._id}`,   // synthetic id
+        userId:     u._id,
+        type:       'new_user',
+        title:      'New user registered',
+        message:    `${u.name} joined as ${u.role}`,
+        createdAt:  u.createdAt,
+        isReadByMe: false,                 // always unread until dismissed
+      })));
+    } catch {}
+  }, [user?.role]);
 
   const fetchNotifications = useCallback(async () => {
     try {
       const res = await notificationsAPI.getAll();
-      setNotifications(res.data.notifications || []);
-      setUnreadCount(res.data.unreadCount || 0);
+      const allNotifs = res.data.notifications || [];
+      const visible = allNotifs.filter(n =>
+        n.type !== 'student_reply' &&
+        !(n.type === 'status_changed' && user?.role !== 'admin')
+      );
+      setNotifications(allNotifs);
+      setUnreadCount(visible.filter(n => !n.isReadByMe).length);
     } catch {}
-  }, []);
+  }, [user?.role]);
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 10000);
+    fetchNewUserNotifs();
+    const interval = setInterval(() => {
+      fetchNotifications();
+      fetchNewUserNotifs();
+    }, 10000);
     return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  }, [fetchNotifications, fetchNewUserNotifs]);
+
+  // Re-fetch new-user notifs when Students.jsx marks someone as viewed
+  useEffect(() => {
+    window.addEventListener('newUserViewed', fetchNewUserNotifs);
+    return () => window.removeEventListener('newUserViewed', fetchNewUserNotifs);
+  }, [fetchNewUserNotifs]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -60,35 +141,48 @@ const NotificationBell = ({ isLightMode }) => {
     return () => window.removeEventListener('feedbackModalOpen', onModalChange);
   }, []);
 
-  const handleOpen = async () => {
-    const next = !open;
-    setOpen(next);
-    if (next && unreadCount > 0) {
-      try {
-        await notificationsAPI.markAllRead();
-        setNotifications(prev => prev.map(n => ({ ...n, isReadByMe: true })));
-        setUnreadCount(0);
-      } catch {}
-    }
-  };
+ const handleOpen = () => {
+  setOpen(prev => !prev);
+};
 
-  const handleDelete = async (e, id) => {
+  const handleDelete = async (e, notif) => {
     e.stopPropagation();
+    if (notif.type === 'new_user') {
+      // Mark as viewed in localStorage so it disappears everywhere
+      markUserAsViewed(notif.userId);
+      setNewUserNotifs(prev => prev.filter(n => n._id !== notif._id));
+      return;
+    }
     try {
-      await notificationsAPI.deleteOne(id);
-      setNotifications(prev => prev.filter(n => n._id !== id));
+      await notificationsAPI.deleteOne(notif._id);
+      setNotifications(prev => prev.filter(n => n._id !== notif._id));
     } catch {}
   };
 
   const handleClearAll = async () => {
+    // Clear regular notifications
     try {
       await notificationsAPI.clearAll();
       setNotifications([]);
       setUnreadCount(0);
     } catch {}
+    // Also dismiss all new-user notifs
+    if (newUserNotifs.length > 0) {
+      markAllUsersAsViewed(newUserNotifs.map(n => n.userId));
+      setNewUserNotifs([]);
+    }
   };
 
   const handleClickNotification = async (notif) => {
+    if (notif.type === 'new_user') {
+      // Mark this user as viewed and navigate to Manage Users
+      markUserAsViewed(notif.userId);
+      setNewUserNotifs(prev => prev.filter(n => n._id !== notif._id));
+      setOpen(false);
+      navigate('/students');
+      return;
+    }
+
     if (!notif.isReadByMe) {
       try {
         await notificationsAPI.markRead(notif._id);
@@ -101,9 +195,7 @@ const NotificationBell = ({ isLightMode }) => {
 
     setOpen(false);
 
-    if (notif.type === 'dm_message' && notif.threadId) {
-      navigate(`/messages?thread=${notif.threadId}`);
-    } else if (notif.type === 'student_reply' && notif.feedbackId) {
+    if (notif.type === 'student_reply' && notif.feedbackId) {
       navigate(`/feedback/${notif.feedbackId}/chat`);
     } else if (notif.feedbackId) {
       navigate(`/feedback?open=${notif.feedbackId}`);
@@ -115,6 +207,16 @@ const NotificationBell = ({ isLightMode }) => {
   const hoverBg       = isLightMode ? 'rgba(109,40,217,0.06)' : 'rgba(255,255,255,0.05)';
   const panelBg       = isLightMode ? 'rgba(255,255,255,0.98)' : 'linear-gradient(145deg,#1a1025,#0f0a1a)';
   const panelBorder   = isLightMode ? '1px solid rgba(196,181,253,0.5)' : '1px solid rgba(255,255,255,0.12)';
+
+  // ── Merge new-user notifs (on top) with regular filtered notifs ──
+  const filteredRegular = notifications.filter(n =>
+    n.type !== 'student_reply' &&
+    !(n.type === 'status_changed' && user?.role !== 'admin')
+  );
+  const allVisible = [...newUserNotifs, ...filteredRegular];
+
+  // ── Total bell badge: regular unread + unviewed new users ──
+  const totalUnread = unreadCount + newUserNotifs.length;
 
   if (feedbackModalOpen) return null;
 
@@ -132,12 +234,12 @@ const NotificationBell = ({ isLightMode }) => {
           background: open
             ? 'linear-gradient(135deg,rgba(124,58,237,0.35),rgba(219,39,119,0.2))'
             : isLightMode
-              ? 'rgba(124,58,237,0.15)'                   // ← light mode: more visible
+              ? 'rgba(124,58,237,0.15)'
               : 'rgba(124,58,237,0.12)',
           border: open
             ? '1.5px solid rgba(124,58,237,0.55)'
             : isLightMode
-              ? '1.5px solid rgba(109,40,217,0.5)'        // ← light mode: strong border
+              ? '1.5px solid rgba(109,40,217,0.5)'
               : '1px solid rgba(124,58,237,0.35)',
           cursor: 'pointer',
           display: 'flex',
@@ -152,11 +254,12 @@ const NotificationBell = ({ isLightMode }) => {
           color: open
             ? '#a78bfa'
             : isLightMode
-              ? '#7c3aed'                                  // ← light mode: solid purple icon
+              ? '#7c3aed'
               : 'rgba(200,190,240,0.7)',
           transition: 'color 0.2s',
         }} />
-        {unreadCount > 0 && (
+        {/* Badge shows total: support unread (feedbackCount) + new users */}
+        {(unreadCount + newUserNotifs.length) > 0 && (
           <span style={{
             position: 'absolute',
             top: '-5px',
@@ -165,7 +268,7 @@ const NotificationBell = ({ isLightMode }) => {
             height: '16px',
             borderRadius: '999px',
             background: 'linear-gradient(135deg,#ef4444,#dc2626)',
-            border: isLightMode ? '2px solid #ffffff' : '2px solid #0f0a1e', // ← light mode: white border on badge
+            border: isLightMode ? '2px solid #ffffff' : '2px solid #0f0a1e',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -175,30 +278,30 @@ const NotificationBell = ({ isLightMode }) => {
             padding: '0 3px',
             fontFamily: "'DM Mono', monospace",
           }}>
-            {unreadCount > 99 ? '99+' : unreadCount}
+           {(unreadCount + newUserNotifs.length) > 99 ? '99+' : (unreadCount + newUserNotifs.length)}
           </span>
         )}
       </button>
 
       {/* ── Dropdown Panel ── */}
-     {open && (
-  <div style={{
-    position: 'absolute',
-    top: 'calc(100% + 8px)',
-    left: '0',
-    width: '360px',
-    maxHeight: '480px',
-    borderRadius: '16px',
-    background: panelBg,
-    border: panelBorder,
-    boxShadow: isLightMode
-      ? '0 20px 60px rgba(109,40,217,0.15)'
-      : '0 20px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(124,58,237,0.2)',
-    zIndex: 9999,
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
-  }}>
+      {open && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(100% + 8px)',
+          left: '0',
+          width: '360px',
+          maxHeight: '480px',
+          borderRadius: '16px',
+          background: panelBg,
+          border: panelBorder,
+          boxShadow: isLightMode
+            ? '0 20px 60px rgba(109,40,217,0.15)'
+            : '0 20px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(124,58,237,0.2)',
+          zIndex: 9999,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}>
 
           {/* Header */}
           <div style={{
@@ -216,7 +319,7 @@ const NotificationBell = ({ isLightMode }) => {
               <span style={{ fontSize: '13px', fontWeight: 700, color: textPrimary, fontFamily: "'DM Sans',sans-serif" }}>
                 Notifications
               </span>
-              {unreadCount > 0 && (
+              {totalUnread > 0 && (
                 <span style={{
                   fontSize: '9px',
                   fontWeight: 700,
@@ -226,12 +329,12 @@ const NotificationBell = ({ isLightMode }) => {
                   borderRadius: '999px',
                   fontFamily: "'DM Mono',monospace",
                 }}>
-                  {unreadCount} new
+                  {totalUnread} new
                 </span>
               )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              {notifications.length > 0 && (
+              {allVisible.length > 0 && (
                 <button
                   onClick={handleClearAll}
                   style={{
@@ -266,7 +369,7 @@ const NotificationBell = ({ isLightMode }) => {
 
           {/* List */}
           <div style={{ overflowY: 'auto', flex: 1 }}>
-            {notifications.length === 0 ? (
+            {allVisible.length === 0 ? (
               <div style={{
                 padding: '48px 24px', textAlign: 'center',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
@@ -287,7 +390,7 @@ const NotificationBell = ({ isLightMode }) => {
                 </p>
               </div>
             ) : (
-              notifications.map((notif) => {
+              allVisible.map((notif) => {
                 const cfg = TYPE_CONFIG[notif.type] || TYPE_CONFIG.new_feedback;
                 return (
                   <div
@@ -355,21 +458,31 @@ const NotificationBell = ({ isLightMode }) => {
                         <span style={{ fontSize: '10px', color: textSecondary }}>
                           {timeAgo(notif.createdAt)}
                         </span>
-                        {(notif.feedbackId || notif.threadId) && (
+                        {/* Navigate hint */}
+                        {notif.type === 'new_user' && (
+                          <span style={{
+                            fontSize: '10px', color: '#ef4444',
+                            display: 'flex', alignItems: 'center', gap: '2px',
+                          }}>
+                            <ExternalLink style={{ width: '9px', height: '9px' }} />
+                            View in Manage Users
+                          </span>
+                        )}
+                        {notif.feedbackId && (
                           <span style={{
                             fontSize: '10px', color: '#7c3aed',
                             display: 'flex', alignItems: 'center', gap: '2px',
                           }}>
                             <ExternalLink style={{ width: '9px', height: '9px' }} />
-                            {notif.type === 'dm_message' ? 'Open message' : 'View feedback'}
+                            View feedback
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Delete */}
+                    {/* Delete / dismiss */}
                     <button
-                      onClick={(e) => handleDelete(e, notif._id)}
+                      onClick={(e) => handleDelete(e, notif)}
                       style={{
                         width: '22px', height: '22px', borderRadius: '5px',
                         background: 'none', border: 'none', cursor: 'pointer',
@@ -394,7 +507,7 @@ const NotificationBell = ({ isLightMode }) => {
           </div>
 
           {/* Footer */}
-          {notifications.length > 0 && (
+          {allVisible.length > 0 && (
             <div style={{
               padding: '10px 14px',
               borderTop: isLightMode
@@ -407,6 +520,11 @@ const NotificationBell = ({ isLightMode }) => {
                   await notificationsAPI.markAllRead();
                   setNotifications(prev => prev.map(n => ({ ...n, isReadByMe: true })));
                   setUnreadCount(0);
+                  // Also dismiss all new-user notifs
+                  if (newUserNotifs.length > 0) {
+                    markAllUsersAsViewed(newUserNotifs.map(n => n.userId));
+                    setNewUserNotifs([]);
+                  }
                 }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '5px',

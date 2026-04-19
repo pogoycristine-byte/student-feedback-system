@@ -93,6 +93,18 @@ export const notificationsAPI = {
   markAllRead: ()    => api.put('/notifications/read-all'),
   deleteOne:   (id)  => api.delete(`/notifications/${id}`),
   clearAll:    ()    => api.delete('/notifications/clear-all'),
+  
 };
-
+export const supportAPI = {
+  getStudentList:     ()              => api.get('/support/students'),
+  getThreads:         ()              => api.get('/support/threads'),
+  getMessages:        (id)            => api.get(`/support/threads/${id}/messages`),
+  send:               (id, msg)       => api.post(`/support/threads/${id}/messages`, { message: msg }),
+  markAsRead:         (id)            => api.patch(`/support/threads/${id}/read`),
+  updateStatus:       (id, status)    => api.patch(`/support/threads/${id}/status`, { status }),
+  editMessage:        (id, mId, msg)  => api.patch(`/support/threads/${id}/messages/${mId}`, { message: msg }),
+  deleteMessage:      (id, mId)       => api.delete(`/support/threads/${id}/messages/${mId}`),
+  deleteMessageForMe: (id, mId)       => api.delete(`/support/threads/${id}/messages/${mId}/me`),
+  deleteThread:       (id)            => api.delete(`/support/threads/${id}`),
+};
 export default api;

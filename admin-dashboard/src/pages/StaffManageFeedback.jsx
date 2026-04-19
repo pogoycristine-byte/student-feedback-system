@@ -19,9 +19,7 @@ import {
 } from 'lucide-react';
 
 const STATUS_TABS = [
-  { key: 'all',          label: 'All Unresolved', color: 'from-violet-500 to-pink-500' },
-  { key: 'Pending',      label: 'Pending',        color: 'from-yellow-500 to-orange-500' },
-  { key: 'Under Review', label: 'Under Review',   color: 'from-blue-500 to-cyan-500' },
+  { key: 'Pending', label: 'Pending', color: 'from-yellow-500 to-orange-500' },
 ];
 
 const STATUS_STYLE = {
@@ -70,7 +68,7 @@ const StaffManageFeedback = () => {
   const [feedback, setFeedback] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState('Pending');
   const [search, setSearch] = useState('');
 
   // Schedule modal state
@@ -350,9 +348,6 @@ const StaffManageFeedback = () => {
                 {tab.label}
                 {tab.key === 'Pending' && pendingCount > 0 && (
                   <span className="ml-2 bg-yellow-500 text-white text-xs px-1.5 py-0.5 rounded-full">{pendingCount}</span>
-                )}
-                {tab.key === 'Under Review' && underReviewCount > 0 && (
-                  <span className="ml-2 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full">{underReviewCount}</span>
                 )}
               </button>
             ))}

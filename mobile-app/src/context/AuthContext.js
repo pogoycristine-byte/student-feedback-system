@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Alert } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { authAPI } from '../services/api';
 
@@ -38,6 +38,28 @@ export const AuthProvider = ({ children }) => {
     };
   }, [user]);
 
+  // ✅ ADDED: poll account status every 30s — auto logout if admin deactivates account
+  useEffect(() => {
+    if (!user) return;
+
+    const interval = setInterval(async () => {
+      try {
+        await authAPI.checkStatus();
+      } catch (error) {
+        if (error.response?.status === 403 && error.response?.data?.deactivated) {
+          await logout();
+          Alert.alert(
+            'Account Deactivated',
+            'Your account has been deactivated. Please contact your administrator.',
+            [{ text: 'OK' }]
+          );
+        }
+      }
+    }, 30 * 1000);
+
+    return () => clearInterval(interval);
+  }, [user]);
+
   const loadUser = async () => {
     try {
       const token = await SecureStore.getItemAsync('token');
@@ -65,7 +87,16 @@ export const AuthProvider = ({ children }) => {
 
       const response = await authAPI.login({ email, password });
       const { token, user } = response.data;
-      
+
+      // ── ADDED: Block admin/staff from accessing the student mobile app ──
+      if (['admin', 'staff'].includes(user.role)) {
+        return {
+          success: false,
+          message: 'Access denied. This app is for students only. Please use the admin web portal.',
+        };
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       await SecureStore.setItemAsync('token', token);
       await SecureStore.setItemAsync('user', JSON.stringify(user));
       setUser(user);
@@ -119,7 +150,6 @@ export const AuthProvider = ({ children }) => {
     try {
       setUser(prevUser => {
         const updatedUser = { ...prevUser, ...updatedFields };
-        // persist to SecureStore in the background
         SecureStore.setItemAsync('user', JSON.stringify(updatedUser)).catch(err =>
           console.error('Error persisting updated user:', err)
         );

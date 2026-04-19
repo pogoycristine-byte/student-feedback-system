@@ -13,11 +13,12 @@ import {
   Sun,
   Moon,
   Megaphone,
+  LifeBuoy,
   MessagesSquare,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import lasLogo from '../las.png';
-import { feedbackAPI, messagesAPI } from '../services/api';
+import { feedbackAPI, messagesAPI, supportAPI, userAPI } from '../services/api';
 import { getSchedules } from '../utils/scheduleHelpers';
 import NotificationBell from './NotificationBell';
 
@@ -156,10 +157,29 @@ export const markChatAsRead = (feedbackId, lastMessageId) => {
   window.dispatchEvent(new Event('adminReadChat'));
 };
 
-// These are kept as no-ops so existing imports in MessagesPage don't break,
-// but DM read state is now tracked entirely in the backend.
+// ── Support read tracking ─────────────────────────────────────────────────
+const SUPPORT_LAST_READ_KEY = 'adminLastReadSupportMsgId';
+export const getSupportLastRead = () => {
+  try { return JSON.parse(localStorage.getItem(SUPPORT_LAST_READ_KEY) || '{}'); }
+  catch { return {}; }
+};
+export const markSupportAsRead = (threadId, lastMessageId) => {
+  const map = getSupportLastRead();
+  map[threadId] = lastMessageId;
+  localStorage.setItem(SUPPORT_LAST_READ_KEY, JSON.stringify(map));
+  window.dispatchEvent(new Event('adminReadSupport'));
+};
+
+// Kept as no-ops so existing imports don't break
 export const getDmLastRead = () => ({});
 export const markDmAsRead  = () => {};
+
+// ── New-user viewed tracking (mirrors Students.jsx localStorage key) ───────
+const VIEWED_NEW_USERS_KEY = 'viewedNewUserIds';
+const getViewedNewUserIds = () => {
+  try { return new Set(JSON.parse(localStorage.getItem(VIEWED_NEW_USERS_KEY) || '[]')); }
+  catch { return new Set(); }
+};
 
 const getDueStatus = (item) => {
   if (item.status === 'Resolved' || item.status === 'Rejected') return null;
@@ -264,14 +284,16 @@ const Sidebar = () => {
   const userRef = useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
 
-  // authController returns { id, name, role, ... } — NOT _id.
   const userId = String(user?.id || user?._id || '');
 
-  const [newFeedbackCount, setNewFeedbackCount] = useState(0);
-  const [unreadChatCount, setUnreadChatCount]   = useState(0);
-  const [dueSoonCount, setDueSoonCount]         = useState(0);
-  const [overdueCount, setOverdueCount]         = useState(0);
-  const [unreadDmCount, setUnreadDmCount]       = useState(0);
+  const [newFeedbackCount, setNewFeedbackCount]     = useState(0);
+  const [unreadChatCount, setUnreadChatCount]       = useState(0);
+  const [dueSoonCount, setDueSoonCount]             = useState(0);
+  const [overdueCount, setOverdueCount]             = useState(0);
+  const [unreadDmCount, setUnreadDmCount]           = useState(0);
+  const [unreadSupportCount, setUnreadSupportCount] = useState(0);
+  // ── NEW: count of newly registered users not yet viewed by admin ──
+  const [newUsersCount, setNewUsersCount]           = useState(0);
 
   const isAdmin = user?.role === 'admin';
   const [lightMode, setLightMode] = useState(
@@ -301,8 +323,6 @@ const Sidebar = () => {
     setDueSoonCount(count);
   };
 
-  // ── DM unread count ──
-  // Now fully backend-driven: getThreads returns isUnread per thread.
   const computeDmCount = async () => {
     if (!userRef.current?.name) return;
     try {
@@ -310,6 +330,49 @@ const Sidebar = () => {
       const threads = res.data.threads || [];
       const count   = threads.filter(t => t.isUnread).length;
       setUnreadDmCount(count);
+    } catch {}
+  };
+
+  const computeSupportCount = async () => {
+    try {
+      const res     = await supportAPI.getThreads();
+      const threads = res.data.threads || [];
+      const lastRead = getSupportLastRead();
+
+      const count = threads.filter(t => {
+        if (t.status === 'Resolved' || t.status === 'Closed') return false;
+        if (!t.isUnread) return false;
+        // If we've locally marked this thread's last message as read, don't count it
+        const lastMsgId = t.lastMessage?._id || t.lastMessage;
+        if (!lastMsgId) return false;
+        return lastRead[String(t._id)] !== String(lastMsgId);
+      }).length;
+
+      setUnreadSupportCount(count);
+    } catch {}
+  };
+
+  // ── NEW: compute how many users registered in the last 24h haven't been viewed ──
+  const computeNewUsersCount = async () => {
+    try {
+      const [studentsRes, staffRes, adminRes] = await Promise.all([
+        userAPI.getAll({ role: 'student' }),
+        userAPI.getAll({ role: 'staff' }),
+        userAPI.getAll({ role: 'admin' }),
+      ]);
+      const all = [
+        ...(studentsRes.data.users || []),
+        ...(staffRes.data.users   || []),
+        ...(adminRes.data.users   || []),
+      ];
+      const viewed = getViewedNewUserIds();
+      const now = new Date();
+      const count = all.filter(u => {
+        if (!u.createdAt) return false;
+        const hoursDiff = (now - new Date(u.createdAt)) / (1000 * 60 * 60);
+        return hoursDiff <= 24 && !viewed.has(u._id);
+      }).length;
+      setNewUsersCount(count);
     } catch {}
   };
 
@@ -361,23 +424,32 @@ const Sidebar = () => {
       computeCounts();
       computeScheduleBadge();
       computeDmCount();
+      computeSupportCount();
+      computeNewUsersCount();
     }, 15000);
 
-    window.addEventListener('feedbackDismissed', computeCounts);
-    window.addEventListener('adminReadChat',     computeCounts);
-    window.addEventListener('schedulesUpdated',  computeScheduleBadge);
-    window.addEventListener('adminReadDm',       computeDmCount);
-    window.addEventListener('dmSent',            computeDmCount);
-    window.addEventListener('newDmReceived',     computeDmCount);
+    window.addEventListener('feedbackDismissed',  computeCounts);
+    window.addEventListener('adminReadChat',       computeCounts);
+    window.addEventListener('schedulesUpdated',    computeScheduleBadge);
+    window.addEventListener('adminReadDm',         computeDmCount);
+    window.addEventListener('dmSent',              computeDmCount);
+    window.addEventListener('newDmReceived',       computeDmCount);
+    window.addEventListener('adminReadSupport',    computeSupportCount);
+    window.addEventListener('newSupportMessage',   computeSupportCount);
+    // ── NEW: re-count when admin views a user (Students.jsx updates localStorage) ──
+    window.addEventListener('newUserViewed',       computeNewUsersCount);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('feedbackDismissed', computeCounts);
-      window.removeEventListener('adminReadChat',     computeCounts);
-      window.removeEventListener('schedulesUpdated',  computeScheduleBadge);
-      window.removeEventListener('adminReadDm',       computeDmCount);
-      window.removeEventListener('dmSent',            computeDmCount);
-      window.removeEventListener('newDmReceived',     computeDmCount);
+      window.removeEventListener('feedbackDismissed',  computeCounts);
+      window.removeEventListener('adminReadChat',       computeCounts);
+      window.removeEventListener('schedulesUpdated',    computeScheduleBadge);
+      window.removeEventListener('adminReadDm',         computeDmCount);
+      window.removeEventListener('dmSent',              computeDmCount);
+      window.removeEventListener('newDmReceived',       computeDmCount);
+      window.removeEventListener('adminReadSupport',    computeSupportCount);
+      window.removeEventListener('newSupportMessage',   computeSupportCount);
+      window.removeEventListener('newUserViewed',       computeNewUsersCount);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -387,6 +459,8 @@ const Sidebar = () => {
     computeCounts();
     computeScheduleBadge();
     computeDmCount();
+    computeSupportCount();
+    computeNewUsersCount();
   }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalBadge = newFeedbackCount + unreadChatCount;
@@ -403,9 +477,10 @@ const Sidebar = () => {
     {
       label: 'Management',
       items: [
-        { name: 'Manage Feedback',    path: '/feedback',   icon: MessageSquare, badge: totalBadge, overdueBadge: overdueCount },
-        { name: 'Manage Categories',  path: '/categories', icon: FolderOpen },
-        { name: 'Manage Users',       path: '/students',   icon: Users },
+        { name: 'Manage Feedback',   path: '/feedback',        icon: MessageSquare, badge: totalBadge, overdueBadge: overdueCount },
+        { name: 'Support Tickets',   path: '/support-tickets', icon: LifeBuoy,      badge: unreadSupportCount },
+        { name: 'Manage Categories', path: '/categories',      icon: FolderOpen },
+        { name: 'Manage Users',      path: '/students',        icon: Users,         badge: newUsersCount },
       ],
     },
     {
@@ -434,8 +509,9 @@ const Sidebar = () => {
     {
       label: 'Feedback',
       items: [
-        { name: 'Feedback',        path: '/feedback',     icon: MessageSquare, badge: totalBadge, overdueBadge: overdueCount },
-        { name: 'Manage Feedback', path: '/staff/manage', icon: ClipboardList },
+        { name: 'Feedback',        path: '/feedback',        icon: MessageSquare, badge: totalBadge, overdueBadge: overdueCount },
+        { name: 'Manage Feedback', path: '/staff/manage',    icon: ClipboardList },
+        { name: 'Support Tickets', path: '/support-tickets', icon: LifeBuoy,      badge: unreadSupportCount }, // ── added for staff coverage ──
       ],
     },
     {
@@ -444,11 +520,10 @@ const Sidebar = () => {
         { name: 'My Schedules', path: '/schedules', icon: CalendarClock, badge: dueSoonCount },
       ],
     },
-    // ── added: staff can access Settings (limited view handled in SystemSettings) ──
     {
       label: 'Settings',
       items: [
-        { name: 'Settings', path: '/settings', icon: Settings },
+        { name: 'Settings', path: '/staff/settings', icon: Settings },
       ],
     },
   ];
@@ -522,7 +597,6 @@ const Sidebar = () => {
               }}>
                 {user?.name}
               </span>
-              {/* ── Role badge hidden for admin to prevent name wrapping ── */}
               {user?.role && !isAdmin && (
                 <span style={{
                   fontFamily: "'DM Mono', monospace",
@@ -541,11 +615,9 @@ const Sidebar = () => {
             </div>
           </div>
 
-          {/* ── Notification Bell sits here, inside the sidebar ── */}
-         {/* ── Notification Bell sits here, inside the sidebar ── */}
-<div style={{ marginTop: '6px' }}>
-  <NotificationBell isLightMode={lightMode} />
-</div>
+          <div style={{ marginTop: '6px' }}>
+            <NotificationBell isLightMode={lightMode} feedbackCount={unreadSupportCount} />
+          </div>
         </div>
       </div>
 

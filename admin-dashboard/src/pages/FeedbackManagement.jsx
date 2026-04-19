@@ -1251,7 +1251,7 @@ const FeedbackManagement = () => {
                     },
                     selectedFeedback.teacherName ? { label: 'Teacher', value: selectedFeedback.teacherName } : { label: 'Priority', value: selectedFeedback.priority },
                     selectedFeedback.location ? { label: 'Location', value: `📍 ${selectedFeedback.location}` } : null,
-                    selectedFeedback.dateTime ? { label: 'Class Date & Time', value: `🕐 ${selectedFeedback.dateTime}` } : null,
+                   selectedFeedback.dateTime ? { label: 'Class Date & Time', value: `🕐 ${selectedFeedback.dateTime.replace(/&#x2F;/g, '/')}` } : null,
                     { label: 'Submitted', value: new Date(selectedFeedback.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) },
                     // ── Last Updated By: clickable in modal too ──
                     selectedFeedback.lastUpdatedBy ? {
@@ -1361,12 +1361,18 @@ const FeedbackManagement = () => {
                   </div>
                   <div className="mb-3">
                     <p className="text-[9px] uppercase tracking-widest font-semibold mb-1" style={{ color: isLightMode ? '#4c1d95' : '#6b7280' }}>New Status</p>
-                    <select className="modal-status-select w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all" style={selectStyle} value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
-                      <option value="Pending" style={optionStyle}>Pending</option>
-                      <option value="Under Review" style={optionStyle}>Under Review</option>
-                      <option value="Rejected" style={optionStyle}>Rejected</option>
-                      <option value="Resolved" style={optionStyle}>Resolved</option>
-                    </select>
+                    <select className="modal-status-select w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all" style={selectStyle} value={newStatus} onChange={(e) => setNewStatus(e.target.value)}
+  disabled={selectedFeedback.status === 'Resolved' || selectedFeedback.status === 'Rejected'}>
+  <option value="Pending" style={optionStyle}>Pending</option>
+  <option value="Under Review" style={optionStyle}>Under Review</option>
+  <option value="Rejected" style={optionStyle}>Rejected</option>
+  <option value="Resolved" style={optionStyle}>Resolved</option>
+</select>
+{(selectedFeedback.status === 'Resolved' || selectedFeedback.status === 'Rejected') && (
+  <p className="text-xs mt-1" style={{ color: '#ef4444' }}>
+    This feedback is {selectedFeedback.status.toLowerCase()} and can no longer be updated.
+  </p>
+)}
                   </div>
                   <div className="mb-2">
                     <p className="text-[9px] uppercase tracking-widest font-semibold mb-1" style={{ color: isLightMode ? '#4c1d95' : '#6b7280' }}>
@@ -1379,7 +1385,8 @@ const FeedbackManagement = () => {
                   </div>
                 </div>
                 <div className="mt-auto flex flex-col gap-2">
-                  <button onClick={handleUpdateStatus}
+                 <button onClick={handleUpdateStatus}
+  disabled={selectedFeedback.status === 'Resolved' || selectedFeedback.status === 'Rejected'}
                     className="w-full py-2.5 rounded-lg text-white font-semibold text-sm transition-all hover:opacity-90 active:scale-[0.98]"
                     style={{ background: 'linear-gradient(135deg, #7c3aed, #db2777)', boxShadow: '0 4px 20px rgba(124,58,237,0.4)' }}>
                     Update Feedback

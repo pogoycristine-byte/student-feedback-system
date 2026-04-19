@@ -76,7 +76,16 @@ const LoginScreen = ({ navigation }) => {
     setLoading(false);
 
     if (!result.success) {
-      Alert.alert('Login Failed', result.message);
+      // ✅ ADDED: specific alert for deactivated accounts
+      if (result.message?.toLowerCase().includes('deactivat')) {
+        Alert.alert(
+          'Account Deactivated',
+          'Your account has been deactivated. Please contact your administrator.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Login Failed', result.message);
+      }
     } else {
       try {
         if (rememberMe) {

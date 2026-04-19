@@ -12,6 +12,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { feedbackAPI } from '../services/api';
+import messaging from '@react-native-firebase/messaging';
+import * as Notifications from 'expo-notifications';
+
+// Show system notification banner even when app is in foreground
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 const READ_NOTIFICATIONS_KEY = 'readNotifications';
 const LAST_READ_MSG_KEY = 'studentLastReadMsgId';
@@ -42,6 +53,27 @@ const NotificationsScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     fetchNotifications();
+  }, []);
+
+  // FCM foreground listener — shows system banner + refreshes list
+  useEffect(() => {
+    const requestPermission = async () => {
+      await messaging().requestPermission();
+    };
+    requestPermission();
+
+    const unsubscribe = messaging().onMessage(async remoteMessage => {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: remoteMessage.notification?.title ?? 'New Notification',
+          body: remoteMessage.notification?.body ?? '',
+        },
+        trigger: null,
+      });
+      fetchNotifications();
+    });
+
+    return unsubscribe;
   }, []);
 
   useFocusEffect(

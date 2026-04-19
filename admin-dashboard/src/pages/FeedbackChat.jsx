@@ -4,6 +4,19 @@ import { feedbackAPI } from '../services/api';
 import { ArrowLeft, Send, MapPin, Calendar, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
+// ── Mark-as-read helpers (same keys as Sidebar/FeedbackManagement) ──
+const LAST_READ_KEY = 'adminLastReadMsgId';
+const getLastRead = () => {
+  try { return JSON.parse(localStorage.getItem(LAST_READ_KEY) || '{}'); }
+  catch { return {}; }
+};
+const markChatRead = (feedbackId, lastMessageId) => {
+  const map = getLastRead();
+  map[feedbackId] = lastMessageId;
+  localStorage.setItem(LAST_READ_KEY, JSON.stringify(map));
+  window.dispatchEvent(new Event('adminReadChat'));
+};
+
 const FeedbackChat = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -37,7 +50,14 @@ const FeedbackChat = () => {
     try {
       const response = await feedbackAPI.getMessages(id);
       setFeedback(response.data.feedback);
-      setMessages(response.data.messages);
+      const msgs = response.data.messages;
+      setMessages(msgs);
+
+      // Mark as read on every poll tick so sidebar badge clears while actively viewing
+      if (msgs && msgs.length > 0) {
+        const lastMsg = msgs[msgs.length - 1];
+        markChatRead(id, lastMsg._id);
+      }
     } catch (error) {
       console.error('Error fetching messages:', error);
     } finally {
@@ -155,9 +175,9 @@ const FeedbackChat = () => {
                         : 'bg-white/10 text-white border border-white/20'
                     }`}
                   >
-                   <p className={`text-xs mb-1 ${isMyMessage ? 'opacity-80' : 'opacity-70'}`}>
-  {senderDisplayName === roleLabel ? senderDisplayName : `${senderDisplayName} • ${roleLabel}`}
-</p>
+                    <p className={`text-xs mb-1 ${isMyMessage ? 'opacity-80' : 'opacity-70'}`}>
+                      {senderDisplayName === roleLabel ? senderDisplayName : `${senderDisplayName} • ${roleLabel}`}
+                    </p>
                     <p className="text-sm leading-relaxed">{msg.message}</p>
                     <p className={`text-xs mt-1 ${isMyMessage ? 'opacity-80' : 'opacity-50'}`}>
                       {new Date(msg.createdAt).toLocaleTimeString([], {

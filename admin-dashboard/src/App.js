@@ -15,6 +15,7 @@ import StaffManageFeedback from './pages/StaffManageFeedback';
 import SchedulesPage from './pages/SchedulesPage';
 import Announcements from './pages/Announcements';
 import MessagesPage from './pages/MessagesPage';
+import SupportTicketsPage from './pages/SupportTicketsPage';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -133,6 +134,18 @@ function App() {
               }
             />
 
+            {/* ✅ ADDED: PrivateRoute — staff settings, same guard as /schedules */}
+            <Route
+              path="/staff/settings"
+              element={
+                <PrivateRoute>
+                  <AppLayout>
+                    <SystemSettings />
+                  </AppLayout>
+                </PrivateRoute>
+              }
+            />
+
             <Route
               path="/feedback/:id/chat"
               element={
@@ -183,6 +196,18 @@ function App() {
                 <PrivateRoute>
                   <AppLayout>
                     <MessagesPage />
+                  </AppLayout>
+                </PrivateRoute>
+              }
+            />
+
+            {/* ✅ CHANGED: PrivateRoute — staff can now access support tickets */}
+            <Route
+              path="/support-tickets"
+              element={
+                <PrivateRoute>
+                  <AppLayout>
+                    <SupportTicketsPage />
                   </AppLayout>
                 </PrivateRoute>
               }

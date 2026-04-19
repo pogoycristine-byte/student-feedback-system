@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "749749773631",
+    "project_id": "classback-3ce31",
+    "storage_bucket": "classback-3ce31.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:749749773631:android:4a4672b4960c243aefdf8a",
+        "android_client_info": {
+          "package_name": "com.pogoycristine.classback"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC89WPJKVvgiWNQH-GoiYfy1gggMfLBLa4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

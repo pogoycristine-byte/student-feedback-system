@@ -16,7 +16,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { feedbackAPI, announcementAPI } from '../services/api';
-import ToastNotification from '../components/ToastNotification';
 
 const READ_NOTIFICATIONS_KEY = 'readNotifications';
 const LAST_READ_MSG_KEY = 'studentLastReadMsgId';
@@ -29,14 +28,9 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [announcements, setAnnouncements] = useState([]);
   const [announcementIndex, setAnnouncementIndex] = useState(0);
-  const [toast, setToast] = useState(null);
   const [showBanner, setShowBanner] = useState(false);
   const [seenAnnouncementIds, setSeenAnnouncementIds] = useState(new Set());
   const bannerTimeoutRef = useRef(null);
-  const lastSeenStatus  = useRef({});
-  const lastSeenMsg     = useRef({});
-  const toastQueue      = useRef([]);
-  const isShowingToast  = useRef(false);
   const initialized     = useRef(false);
 
   useEffect(() => {
@@ -64,11 +58,6 @@ const HomeScreen = ({ navigation }) => {
     }, [])
   );
 
-  useEffect(() => {
-    const interval = setInterval(pollForUpdates, 15000);
-    return () => clearInterval(interval);
-  }, []);
-
   const fetchAnnouncements = async () => {
     try {
       const res = await announcementAPI.getActive();
@@ -95,69 +84,11 @@ const HomeScreen = ({ navigation }) => {
 
   const initLastSeen = async () => {
     try {
-      const savedMsgMap = await AsyncStorage.getItem(LAST_READ_MSG_KEY);
-      const lastReadMsgMap = savedMsgMap ? JSON.parse(savedMsgMap) : {};
       const response = await feedbackAPI.getMyFeedback();
       const allFeedback = response.data.feedback || [];
-      allFeedback.forEach(item => { lastSeenStatus.current[item._id] = item.status; });
-      lastSeenMsg.current = { ...lastReadMsgMap };
+      allFeedback.forEach(item => {});
       initialized.current = true;
     } catch {}
-  };
-
-  const pollForUpdates = async () => {
-    if (!initialized.current) return;
-    try {
-      const response = await feedbackAPI.getMyFeedback();
-      const allFeedback = response.data.feedback || [];
-      for (const item of allFeedback) {
-        const prevStatus = lastSeenStatus.current[item._id];
-        if (prevStatus && prevStatus !== item.status) {
-          lastSeenStatus.current[item._id] = item.status;
-          enqueueToast({ type: 'status', feedbackId: item._id, subject: item.subject, status: item.status });
-        } else if (!prevStatus) {
-          lastSeenStatus.current[item._id] = item.status;
-        }
-        if (item.adminResponse?.comment) {
-          try {
-            const msgRes = await feedbackAPI.getMessages(item._id);
-            const messages = msgRes.data.messages || [];
-            const lastAdminMsg = [...messages].reverse().find(m => m.senderRole === 'admin' || m.senderRole === 'staff');
-            if (lastAdminMsg && lastSeenMsg.current[item._id] !== lastAdminMsg._id) {
-              lastSeenMsg.current[item._id] = lastAdminMsg._id;
-              enqueueToast({ type: 'message', feedbackId: item._id, subject: item.subject, preview: lastAdminMsg.message });
-            }
-          } catch {}
-        }
-      }
-    } catch {}
-  };
-
-  const enqueueToast = (toastData) => {
-    toastQueue.current.push(toastData);
-    if (!isShowingToast.current) showNextToast();
-  };
-
-  const showNextToast = () => {
-    if (toastQueue.current.length === 0) { isShowingToast.current = false; return; }
-    isShowingToast.current = true;
-    setToast(toastQueue.current.shift());
-  };
-
-  const handleToastDismiss = () => {
-    setToast(null);
-    setTimeout(showNextToast, 400);
-  };
-
-  const handleToastPress = (t) => {
-    setToast(null);
-    isShowingToast.current = false;
-    toastQueue.current = [];
-    if (t.type === 'message') {
-      navigation.navigate('Chat', { feedbackId: t.feedbackId });
-    } else {
-      navigation.navigate('FeedbackDetail', { feedbackId: t.feedbackId });
-    }
   };
 
   const fetchFeedbackCount = async () => {
@@ -284,7 +215,7 @@ const HomeScreen = ({ navigation }) => {
                   <Text style={styles.announcementTitle} numberOfLines={1}>
                     {currentAnnouncement.title}
                   </Text>
-                  <Text style={styles.announcementText} numberOfLines={2}>
+                  <Text style={styles.announcementText} numerOfLines={2}>
                     {currentAnnouncement.message}
                   </Text>
                 </View>
@@ -492,12 +423,6 @@ const HomeScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </View>
-
-      <ToastNotification
-        toast={toast}
-        onDismiss={handleToastDismiss}
-        onPress={handleToastPress}
-      />
     </KeyboardAvoidingView>
   );
 };
@@ -697,7 +622,6 @@ const styles = StyleSheet.create({
   navLabelActive: { fontSize: 11, color: '#BE185D', fontWeight: 'bold' },
   navLabel: { fontSize: 11, color: '#999' },
   navIconWrapper: { position: 'relative', marginBottom: 4 },
-  // ✅ CHANGED: replaced redDot with unreadBadge showing actual count
   unreadBadge: {
     position: 'absolute', top: -4, right: -6,
     backgroundColor: '#EF4444', borderRadius: 10,

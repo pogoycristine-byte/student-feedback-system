@@ -46,6 +46,8 @@ export const authAPI = {
   }),
   // ✅ ADDED: heartbeat to update lastSeen for online status
   heartbeat: () => api.put('/auth/heartbeat'),
+  // ✅ ADDED: poll account status to detect deactivation
+  checkStatus: () => api.get('/auth/status'),
 };
 
 export const feedbackAPI = {
@@ -112,6 +114,17 @@ export const categoryAPI = {
 // ── NEW: Announcements ──
 export const announcementAPI = {
   getActive: () => api.get('/announcements'),
+};
+
+export const supportAPI = {
+  createThread: (subject, message) =>
+    api.post('/support/threads', { subject, message }),
+  send: (id, msg, subject) =>
+    api.post(`/support/threads/${id}/messages`, { message: msg, subject }),
+  getMessages: (id) => api.get(`/support/threads/${id}/messages`),
+  markAsRead: (id) => api.patch(`/support/threads/${id}/read`),
+  getMyThreads: () => api.get('/support/threads/my'),
+  getThreadByUser: () => api.get('/support/threads/my'),
 };
 
 export default api;

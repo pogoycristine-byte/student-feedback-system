@@ -15,15 +15,15 @@ const CustomSplashScreen = ({ onFinish }) => {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#3b1a6e', '#6b1f6e', '#7b1f5e', '#4a1a5e', '#1a1a2e']}
+      colors={['#0a0a14', '#1a0a2e', '#2a0a3e', '#3a0a2e', '#1a0a2e', '#0a0a14']}
       locations={[0, 0.25, 0.5, 0.7, 0.85, 1]}
       start={{ x: 0.2, y: 0 }}
       end={{ x: 0.8, y: 1 }}
       style={styles.container}
     >
-      <View style={styles.topSection}>
-        <Text style={styles.fordaGors}>Forda Gors</Text>
+      <View style={styles.centerSection}>
         <Text style={styles.classBack}>ClassBack</Text>
+        <Text style={styles.subtitle}>Classroom Feedback and Suggestions System</Text>
       </View>
       <Text style={styles.version}>version 1.0.0</Text>
     </LinearGradient>
@@ -36,28 +36,34 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  topSection: {
-    marginTop: height * 0.22,
+  centerSection: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 32,
-  },
-  fordaGors: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    fontStyle: 'italic',
-    color: '#ffffff',
-    marginBottom: 6,
+    marginTop: -60, // Moves everything higher
   },
   classBack: {
-    fontSize: 16,
-    color: '#e879f9',
-    fontWeight: '400',
+    fontSize: 52, // Bigger text
+    fontWeight: 'bold',
+    fontStyle: 'italic',
+    color: '#cccccc',
+    textAlign: 'center',
+    marginBottom: 0, // No gap
+  },
+  subtitle: {
+    fontSize: 14, // Smaller text
+    color: '#8868c4',
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   version: {
     position: 'absolute',
     bottom: 40,
     alignSelf: 'center',
     fontSize: 13,
-    color: '#c084fc',
+    color: '#8868c4',
+    textAlign: 'center',
   },
 });
 

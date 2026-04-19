@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '../context/AuthContext';
+import { supportAPI } from '../services/api';
 
 const faqs = [
   { q: 'How do I submit feedback?', a: 'Tap the "Create New Feedback" button on the Home screen or go to the Feedback tab and fill out the form.' },
@@ -13,7 +15,7 @@ const faqs = [
 
 const HelpCenterScreen = ({ navigation }) => {
   const [openIndex, setOpenIndex] = useState(null);
-
+const { user } = useAuth();
   return (
     <View style={styles.container}>
       <LinearGradient colors={['#6D28D9', '#BE185D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
@@ -30,6 +32,9 @@ const HelpCenterScreen = ({ navigation }) => {
           <Text style={styles.heroEmoji}>🙋</Text>
           <Text style={styles.heroTitle}>How can we help?</Text>
           <Text style={styles.heroSub}>Find answers to common questions below.</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('ContactSupport')} style={styles.heroContactButton}>
+            <Text style={styles.heroContactLink}>Contact Support →</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.sectionLabel}>Frequently Asked Questions</Text>
@@ -49,12 +54,21 @@ const HelpCenterScreen = ({ navigation }) => {
           </TouchableOpacity>
         ))}
 
-        <View style={styles.contactBox}>
-          <Text style={styles.contactText}>Still need help?</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('ContactSupport')}>
-            <Text style={styles.contactLink}>Contact Support →</Text>
-          </TouchableOpacity>
-        </View>
+        {/* ── My Support Messages ── */}
+        <TouchableOpacity
+          style={styles.myMessagesBox}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('StudentSupportChat')}
+        >
+          <View style={styles.myMessagesLeft}>
+            <Text style={styles.myMessagesEmoji}>💬</Text>
+            <View>
+              <Text style={styles.myMessagesTitle}>My Support Messages</Text>
+              <Text style={styles.myMessagesSub}>View your past support conversations</Text>
+            </View>
+          </View>
+          <Text style={styles.myMessagesArrow}>›</Text>
+        </TouchableOpacity>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -74,15 +88,39 @@ const styles = StyleSheet.create({
   heroEmoji: { fontSize: 40, marginBottom: 8 },
   heroTitle: { fontSize: 20, fontWeight: 'bold', color: '#4C1D95', marginBottom: 4 },
   heroSub: { fontSize: 13, color: '#6D28D9', textAlign: 'center' },
+  heroContactButton: { marginTop: 12 },
+  heroContactLink: { fontSize: 14, fontWeight: '700', color: '#6D28D9' },
   sectionLabel: { fontSize: 13, fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
   faqItem: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
   faqHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   faqQ: { fontSize: 14, fontWeight: '600', color: '#1F2937', flex: 1, paddingRight: 8 },
   faqChevron: { fontSize: 14, color: '#6D28D9', fontWeight: 'bold' },
   faqA: { fontSize: 13, color: '#6B7280', lineHeight: 20, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
-  contactBox: { backgroundColor: '#fff', borderRadius: 12, padding: 18, alignItems: 'center', marginTop: 8, borderWidth: 1, borderColor: '#E5E7EB' },
-  contactText: { fontSize: 14, color: '#6B7280', marginBottom: 6 },
-  contactLink: { fontSize: 15, fontWeight: '700', color: '#6D28D9' },
+  myMessagesBox: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  myMessagesLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  myMessagesEmoji: { fontSize: 24, marginRight: 4 },
+  myMessagesTitle: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
+  myMessagesSub: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+  myMessagesArrow: { fontSize: 22, color: '#6D28D9', fontWeight: 'bold' },
 });
 
 export default HelpCenterScreen;

@@ -1,30 +1,52 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '../context/AuthContext'; // adjust path if needed
+import { supportAPI } from '../services/api';     // adjust path if needed
 
 const ContactSupportScreen = ({ navigation }) => {
+  const { user } = useAuth();
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+const handleSend = async () => {
+  if (!subject.trim() || !message.trim()) {
+    Alert.alert('Error', 'Please fill in both subject and message.');
+    return;
+  }
 
-  const handleSend = async () => {
-    if (!subject.trim() || !message.trim()) {
-      Alert.alert('Error', 'Please fill in both subject and message.');
-      return;
-    }
-    setLoading(true);
-    try {
-      // huhays call your API to send support message
-      // await supportAPI.send({ subject, message });
-      Alert.alert('Message Sent!', 'Our support team will get back to you shortly.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
-    } catch {
-      Alert.alert('Error', 'Failed to send message. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // ← Add this to see what your user object actually looks like
+  console.log('user object:', JSON.stringify(user));
+
+  const userId = user?._id || user?.id;  // ← handles both formats
+
+  if (!userId) {
+    Alert.alert('Error', 'User session not found. Please log in again.');
+    return;
+  }
+
+  setLoading(true);
+try {
+  const res = await supportAPI.send(userId, message.trim(), subject.trim());
+  const threadId = res.data.threadId;
+
+  Alert.alert('Message Sent!', 'Our support team will get back to you shortly.', [
+    {
+      text: 'OK',
+      onPress: () => navigation.navigate('StudentSupportChat', {
+        threadId,
+        subject: subject.trim(),
+      }),
+    },
+  ]);
+  } catch (err) {
+    console.log('Support error:', err?.response?.status, err?.response?.data);
+    Alert.alert('Error', 'Failed to send message. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
+  
 
   return (
     <View style={styles.container}>

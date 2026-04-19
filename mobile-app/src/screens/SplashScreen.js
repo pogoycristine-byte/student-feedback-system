@@ -17,12 +17,6 @@ ExpoSplashScreen.hideAsync();
 
 const { width, height } = Dimensions.get('window');
 
-const CURSIVE_FONT = Platform.select({
-  ios: 'Snell Roundhand',
-  android: 'cursive',
-  default: 'cursive',
-});
-
 const SplashScreen = ({ onFinish }) => {
   const [countdown, setCountdown] = useState(5);
 
@@ -142,15 +136,15 @@ const SplashScreen = ({ onFinish }) => {
 
     // Countdown
     const interval = setInterval(() => {
-  setCountdown((prev) => {
-    if (prev <= 1) {
-      clearInterval(interval);
-      setTimeout(() => { if (onFinish) onFinish(); }, 0);
-      return 0;
-    }
-    return prev - 1;
-  });
-}, 1000);
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setTimeout(() => { if (onFinish) onFinish(); }, 0);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     return () => clearInterval(interval);
   }, []);
@@ -176,15 +170,7 @@ const SplashScreen = ({ onFinish }) => {
 
       <Animated.View style={[styles.wrapper, { opacity: contentFadeIn, transform: [{ scale: scaleAnim }] }]}>
 
-        {/* TOP: ClassBack title */}
-        <View style={styles.topSection}>
-          <View style={styles.titleWrapper}>
-            <Text style={[styles.titleText, { color: '#c8c8c8' }]}>Class</Text>
-            <Text style={[styles.titleText, { color: '#8b1a4a' }]}>Back</Text>
-          </View>
-        </View>
-
-        {/* MIDDLE: Lottie animation */}
+        {/* MIDDLE: Lottie animation - moved higher */}
         <View style={styles.middleSpace}>
           <Animated.View style={[styles.lottieWrapper, {
             transform: [{ translateY: iconFloat }, { scale: iconScale }],
@@ -229,30 +215,47 @@ const styles = StyleSheet.create({
     paddingTop: height * 0.08, paddingBottom: height * 0.03,
     paddingHorizontal: 24,
   },
-  topSection: { alignItems: 'center' },
-  titleWrapper: { flexDirection: 'row', alignItems: 'center' },
-  titleText: {
-    fontFamily: CURSIVE_FONT, fontSize: 54,fontWeight: 'bold',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 10,
+  middleSpace: { 
+    flex: 1, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    marginTop: -80, // Moved higher (was -40, now -80)
   },
-  middleSpace: { flex: 1, alignItems: 'center', justifyContent: 'center',marginTop: -40  },
-  lottieWrapper: { alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  lottieWrapper: { 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    marginBottom: 10 
+  },
   lottie: { width: 150, height: 150 },
   iconLabel: {
-    fontSize: 13, color: 'rgba(255,255,255,0.35)',
-    letterSpacing: 1.5, textTransform: 'uppercase',
+    fontSize: 13, 
+    color: 'rgba(255,255,255,0.35)',
+    letterSpacing: 1.5, 
+    textTransform: 'uppercase',
   },
-  bottomSection: { alignItems: 'center', gap: 8 },
+  bottomSection: { 
+    alignItems: 'center', 
+    gap: 8 
+  },
   countdownText: {
-    fontSize: 11, color: 'rgba(255,255,255,0.25)',
+    fontSize: 11, 
+    color: 'rgba(255,255,255,0.25)',
     letterSpacing: 0.5,
   },
-  dotsContainer: { flexDirection: 'row', gap: 12 },
+  dotsContainer: { 
+    flexDirection: 'row', 
+    gap: 12 
+  },
   dot: {
-    width: 10, height: 10, borderRadius: 5, backgroundColor: '#aaaaaa',
-    shadowColor: '#aaaaaa', shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4, shadowRadius: 8, elevation: 8,
+    width: 10, 
+    height: 10, 
+    borderRadius: 5, 
+    backgroundColor: '#aaaaaa',
+    shadowColor: '#aaaaaa', 
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4, 
+    shadowRadius: 8, 
+    elevation: 8,
   },
 });
 

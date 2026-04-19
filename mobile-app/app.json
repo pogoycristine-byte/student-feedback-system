@@ -26,6 +26,7 @@
       "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
       "package": "com.pogoycristine.classback",
+      "googleServicesFile": "./google-services.json",
       "splash": {
         "backgroundColor": "#1a1a2e"
       }
@@ -39,12 +40,17 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#1a1a2e"
+          "backgroundColor": "#1a1a2e",
+          "image": "./assets/splashi.png",
+          "imageWidth": 200
         }
       ],
+      "expo-notifications",
       "expo-video",
       "expo-font",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging"
     ],
     "experiments": {
       "typedRoutes": true,

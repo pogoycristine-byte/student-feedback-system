@@ -54,6 +54,13 @@ const isUserOnline = (user) => {
   return diffSecs < 60;
 };
 
+// ── Check if user is newly registered (within last 24 hours) ──
+const isNewUser = (user) => {
+  if (!user.createdAt) return false;
+  const hoursDiff = (new Date() - new Date(user.createdAt)) / (1000 * 60 * 60);
+  return hoursDiff <= 24;
+};
+
 const formatLastLogin = (dateStr) => {
   if (!dateStr) return { label: 'Never', color: 'text-gray-600', dot: 'bg-gray-600', time: null };
 
@@ -115,33 +122,44 @@ const Students = () => {
   const [logDetailEntry, setLogDetailEntry] = useState(null);
   const [showLogDetailModal, setShowLogDetailModal] = useState(false);
 
+  // ── Track which new-user IDs the admin has already viewed (persisted across refreshes) ──
+  const [viewedUserIds, setViewedUserIds] = useState(() => {
+    try {
+      const stored = localStorage.getItem('viewedNewUserIds');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('viewedNewUserIds', JSON.stringify([...viewedUserIds]));
+    } catch {}
+  }, [viewedUserIds]);
+
   const addActivityLog = (type, userName, detail = '', userId = null, userRole = null) => {
     const entry = {
       id: Date.now() + Math.random(),
-      type,         // 'activate' | 'deactivate' | 'delete'
+      type,
       userName,
       detail,
       userId,
       userRole,
       time: new Date(),
     };
-    setActivityLog(prev => [entry, ...prev].slice(0, 50)); // keep last 50
+    setActivityLog(prev => [entry, ...prev].slice(0, 50));
   };
 
-  // ── Mark all as read ──
   const handleMarkAllAsRead = () => {
     setReadLogIds(new Set(activityLog.map(e => e.id)));
   };
 
-  // ── Unread count ──
   const unreadCount = activityLog.filter(e => !readLogIds.has(e.id)).length;
 
-  // ── Handle clicking a log entry ──
   const handleLogEntryClick = (entry) => {
-    // Mark this entry as read
     setReadLogIds(prev => new Set([...prev, entry.id]));
 
-    // If it's a deactivate entry with a reason, show the detail modal
     if (entry.type === 'deactivate' && entry.detail) {
       setLogDetailEntry(entry);
       setShowLogDetailModal(true);
@@ -149,14 +167,12 @@ const Students = () => {
       return;
     }
 
-    // For activate/delete, navigate to the tab matching the user's role
     if (entry.userRole) {
       const tabMap = { student: 'Students', staff: 'Staff', admin: 'Admin' };
       const targetTab = tabMap[entry.userRole];
       if (targetTab) {
         setActiveTab(targetTab);
         setShowActivityLog(false);
-        // If activate, filter to show the user
         if (entry.type === 'activate' && entry.userName) {
           setSearchTerm(entry.userName);
         }
@@ -164,7 +180,6 @@ const Students = () => {
     }
   };
 
-  // ── Close log panel when clicking outside ──
   useEffect(() => {
     if (!showActivityLog) return;
     const handleClickOutside = (e) => {
@@ -215,6 +230,33 @@ const Students = () => {
 
   useEffect(() => { setCurrentPage(1); }, [searchTerm, onlineFilter, statusFilter, yearLevelFilter]);
 
+  // ── Auto-dismiss NEW badges 5 seconds after users load on this page ──
+  useEffect(() => {
+    if (allUsers.length === 0) return;
+    const now = new Date();
+    const newUserIds = allUsers
+      .filter(u => {
+        if (!u.createdAt) return false;
+        const hoursDiff = (now - new Date(u.createdAt)) / (1000 * 60 * 60);
+        return hoursDiff <= 24;
+      })
+      .map(u => u._id);
+    if (newUserIds.length === 0) return;
+
+    const timer = setTimeout(() => {
+      setViewedUserIds(prev => {
+        const updated = new Set([...prev, ...newUserIds]);
+        try {
+          localStorage.setItem('viewedNewUserIds', JSON.stringify([...updated]));
+        } catch {}
+        return updated;
+      });
+      window.dispatchEvent(new Event('newUserViewed'));
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [allUsers]);
+
   const fetchAllUsers = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -234,17 +276,21 @@ const Students = () => {
     }
   };
 
+  // ── UPDATED: mark user as viewed so NEW badge disappears ──
   const handleViewDetails = async (user) => {
     try {
       const response = await userAPI.getById(user._id);
       setSelectedUser(response.data);
       setShowModal(true);
+      // Mark this user as viewed — NEW badge will no longer show
+      setViewedUserIds(prev => new Set([...prev, user._id]));
+      // Notify sidebar to recompute its new-users badge immediately
+      window.dispatchEvent(new Event('newUserViewed'));
     } catch (error) {
       alert('Failed to load user details');
     }
   };
 
-  // ── Opens remarks modal if deactivating; toggles directly if activating ──
   const handleToggleStatus = (user) => {
     if (user.isActive) {
       setRemarksTarget(user);
@@ -257,12 +303,10 @@ const Students = () => {
   };
 
   const confirmToggleStatus = async (id, remarks, userName, userRole) => {
-    // Determine whether we're activating or deactivating based on remarks presence
     const isDeactivating = !!remarks;
     setRemarksLoading(true);
     try {
       await userAPI.toggleStatus(id, remarks ? { remarks } : undefined);
-      // Log the action — pass userId and userRole for navigation
       addActivityLog(
         isDeactivating ? 'deactivate' : 'activate',
         userName || remarksTarget?.name || 'Unknown user',
@@ -292,7 +336,6 @@ const Students = () => {
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
-      // Find user name before deleting
       const user = allUsers.find(u => u._id === id);
       try {
         await userAPI.delete(id);
@@ -476,7 +519,6 @@ const Students = () => {
                     : '0 20px 50px rgba(0,0,0,0.6), 0 0 0 1px rgba(109,40,217,0.2)',
                 }}
               >
-                {/* Panel header */}
                 <div
                   className="flex items-center justify-between px-4 py-3"
                   style={{ borderBottom: isLightMode ? '1px solid rgba(196,181,253,0.3)' : '1px solid rgba(255,255,255,0.08)' }}
@@ -493,7 +535,6 @@ const Students = () => {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    {/* ── Mark all as read button ── */}
                     {unreadCount > 0 && (
                       <button
                         onClick={handleMarkAllAsRead}
@@ -515,7 +556,6 @@ const Students = () => {
                   </div>
                 </div>
 
-                {/* Log entries */}
                 <div className="overflow-y-auto" style={{ maxHeight: '360px' }}>
                   {activityLog.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 gap-3">
@@ -543,7 +583,6 @@ const Students = () => {
                           entry.type === 'activate'   ? 'Activated' :
                                                         'Deleted';
 
-                        // Determine if this entry is clickable and what hint to show
                         const isClickable =
                           (entry.type === 'deactivate' && !!entry.detail) ||
                           (entry.type === 'activate' && !!entry.userRole) ||
@@ -570,16 +609,12 @@ const Students = () => {
                             }}
                             title={isClickable ? clickHint : undefined}
                           >
-                            {/* Icon badge */}
-                            <div
-                              className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm border ${icon.bg}`}
-                            >
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm border ${icon.bg}`}>
                               {entry.type === 'deactivate' && <UserX className={`w-3.5 h-3.5 ${icon.color}`} />}
                               {entry.type === 'activate'   && <UserCheck className={`w-3.5 h-3.5 ${icon.color}`} />}
                               {entry.type === 'delete'     && <Trash2 className={`w-3.5 h-3.5 ${icon.color}`} />}
                             </div>
 
-                            {/* Content */}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-baseline justify-between gap-2">
                                 <p className="text-xs font-semibold truncate" style={{ color: isLightMode ? '#1e1b4b' : '#e5e7eb' }}>
@@ -587,7 +622,6 @@ const Students = () => {
                                   {entry.userName}
                                 </p>
                                 <div className="flex items-center gap-1.5 shrink-0">
-                                  {/* Unread dot */}
                                   {!isRead && (
                                     <span
                                       className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -605,10 +639,7 @@ const Students = () => {
                                 </p>
                               )}
                               {isClickable && (
-                                <p
-                                  className="text-[10px] mt-0.5 font-medium"
-                                  style={{ color: isLightMode ? '#7c3aed' : '#a78bfa' }}
-                                >
+                                <p className="text-[10px] mt-0.5 font-medium" style={{ color: isLightMode ? '#7c3aed' : '#a78bfa' }}>
                                   {clickHint} →
                                 </p>
                               )}
@@ -620,7 +651,6 @@ const Students = () => {
                   )}
                 </div>
 
-                {/* Panel footer */}
                 {activityLog.length > 0 && (
                   <div
                     className="px-4 py-2.5 text-center"
@@ -634,7 +664,6 @@ const Students = () => {
               </div>
             )}
           </div>
-          {/* ── End Activity Log ── */}
         </div>
       </div>
 
@@ -780,13 +809,51 @@ const Students = () => {
             ) : paginatedUsers.map((user) => {
               const login  = formatLastLogin(user.lastLogin);
               const online = isUserOnline(user);
-              return (
-                <tr key={user._id} className="group hover:bg-white/[0.04] transition-all" style={{ borderBottom: '1px solid rgba(0,0,0,0.25)' }}>
+              // ── NEW badge only shows if user is new AND hasn't been viewed yet ──
+              const showNew = isNewUser(user) && !viewedUserIds.has(user._id);
 
+              return (
+                <tr
+                  key={user._id}
+                  className="group transition-all"
+                  style={{
+                    borderBottom: '1px solid rgba(0,0,0,0.25)',
+                    background: showNew
+                      ? 'rgba(16,185,129,0.06)'
+                      : 'transparent',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = showNew
+                      ? 'rgba(16,185,129,0.1)'
+                      : 'rgba(255,255,255,0.04)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = showNew
+                      ? 'rgba(16,185,129,0.06)'
+                      : 'transparent';
+                  }}
+                >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${online ? 'bg-emerald-400 animate-pulse' : 'bg-gray-600'}`} title={online ? 'Online' : 'Offline'} />
-                      <p className="text-white text-sm font-semibold">{user.name}</p>
+                      {showNew ? (
+                        <div className="relative shrink-0">
+                          <div className="w-2 h-2 bg-red-500 rounded-full" />
+                          <div className="absolute inset-0 w-2 h-2 bg-red-500 rounded-full animate-ping opacity-75" />
+                        </div>
+                      ) : (
+                        <span
+                          className={`w-2 h-2 rounded-full shrink-0 ${online ? 'bg-emerald-400 animate-pulse' : 'bg-gray-600'}`}
+                          title={online ? 'Online' : 'Offline'}
+                        />
+                      )}
+                      <div className="flex items-center gap-2">
+                        <p className="text-white text-sm font-semibold">{user.name}</p>
+                        {showNew && (
+                          <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded-full font-black tracking-wide shrink-0">
+                            NEW
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
 
@@ -941,7 +1008,13 @@ const Students = () => {
           >
             <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: isLightMode ? '1px solid rgba(196,181,253,0.3)' : '1px solid rgba(255,255,255,0.1)' }}>
               <div>
-                <h2 className="text-lg font-bold" style={{ color: isLightMode ? '#1e1b4b' : '#ffffff' }}>{selectedUser.user?.name}</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-bold" style={{ color: isLightMode ? '#1e1b4b' : '#ffffff' }}>{selectedUser.user?.name}</h2>
+                  {/* NEW badge in modal only shows if not yet dismissed (i.e. this is the first open) */}
+                  {isNewUser(selectedUser.user) && !viewedUserIds.has(selectedUser.user?._id) && (
+                    <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded-full font-black tracking-wide">NEW</span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <p className="text-xs font-mono" style={{ color: isLightMode ? '#6b7280' : '#6b7280' }}>{selectedUser.user?.studentId || selectedUser.user?.email}</p>
                   <span className="text-xs bg-violet-500/20 text-violet-300 px-2 py-0.5 rounded-full capitalize">
@@ -963,7 +1036,7 @@ const Students = () => {
                 {[
                   { label: 'Full Name', value: selectedUser.user?.name },
                   { label: 'Role',      value: selectedUser.user?.role },
-                  { label: 'Email',     value: selectedUser.user?.email },
+                  { label: 'Email',     value: selectedUser.user?.email?.toLowerCase() },
                   { label: 'Phone',     value: selectedUser.user?.phoneNumber },
                   ...(selectedUser.user?.role === 'student' ? [
                     { label: 'Student ID', value: selectedUser.user?.studentId },
@@ -994,7 +1067,7 @@ const Students = () => {
                     }}
                   >
                     <p className="text-[10px] uppercase tracking-widest font-semibold mb-1" style={{ color: isLightMode ? '#4c1d95' : '#6b7280' }}>{f.label}</p>
-                    <p className="text-sm font-medium capitalize" style={{ color: isLightMode ? '#1e1b4b' : '#ffffff' }}>{f.value || '—'}</p>
+                    <p className={`text-sm font-medium ${f.label === 'Email' ? '' : 'capitalize'}`} style={{ color: isLightMode ? '#1e1b4b' : '#ffffff' }}>{f.value || '—'}</p>
                   </div>
                 ))}
               </div>
@@ -1169,7 +1242,6 @@ const Students = () => {
               boxShadow: isLightMode ? '0 25px 60px rgba(109,40,217,0.15)' : '0 25px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(251,146,60,0.15)',
             }}
           >
-            {/* Header */}
             <div
               className="flex items-center gap-3 px-6 py-5"
               style={{ borderBottom: isLightMode ? '1px solid rgba(196,181,253,0.3)' : '1px solid rgba(255,255,255,0.08)' }}
@@ -1194,9 +1266,7 @@ const Students = () => {
               </button>
             </div>
 
-            {/* Body */}
             <div className="px-6 py-5 space-y-4">
-              {/* User info */}
               <div
                 className="rounded-xl px-4 py-3"
                 style={{
@@ -1211,15 +1281,12 @@ const Students = () => {
                   {logDetailEntry.userName}
                 </p>
                 {logDetailEntry.userRole && (
-                  <span
-                    className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium capitalize bg-violet-500/20 text-violet-300"
-                  >
+                  <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium capitalize bg-violet-500/20 text-violet-300">
                     {logDetailEntry.userRole}
                   </span>
                 )}
               </div>
 
-              {/* Deactivation reason */}
               <div
                 className="rounded-xl px-4 py-3"
                 style={{
@@ -1235,7 +1302,6 @@ const Students = () => {
                 </p>
               </div>
 
-              {/* Timestamp */}
               <div
                 className="rounded-xl px-4 py-3"
                 style={{
